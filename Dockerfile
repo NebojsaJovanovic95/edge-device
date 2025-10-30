@@ -1,5 +1,5 @@
 # Use PyTorch with CUDA 13.0 runtime
-FROM pytorch/pytorch:2.9.0-cuda13.0-cudnn9-runtime
+FROM docker.io/pytorch/pytorch:2.9.0-cuda13.0-cudnn9-runtime
 
 # Set working directory
 WORKDIR /app
@@ -30,7 +30,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY ./app /app
 
 # Expose any ports your API may use (if using FastAPI/Flask etc.)
-EXPOSE 8000
+EXPOSE 5000
 
 # Default command to run your YOLOv8 API
 CMD ["python", "yolov8_api.py"]
