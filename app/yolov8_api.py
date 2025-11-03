@@ -6,7 +6,7 @@ from ultralytics import YOLO
 import uvicorn, asyncio, tempfile, os, json
 from typing import Any
 
-from stc.config import settings
+from src.config import settings
 from src.DbUtil import DbUtil
 from src.ImageStorage import ImageStorage
 from src.Util import DetectionResponse
