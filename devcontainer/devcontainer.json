@@ -1,0 +1,6 @@
+{
+    "name": "Codespace dev container",
+    "build": {
+        "dockerfile": "../Dockerfile"
+    }
+}
