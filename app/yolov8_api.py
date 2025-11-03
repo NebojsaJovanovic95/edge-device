@@ -2,23 +2,38 @@ from __future__ import annotations
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from ultralytics import YOLO
-import uvicorn
-import tempfile, os, json
+
+import uvicorn, asyncio, tempfile, os, json
 from typing import Any
 
+from stc.config import settings
 from src.DbUtil import DbUtil
 from src.ImageStorage import ImageStorage
 from src.Util import DetectionResponse
+from src.stream_processor import enqueue_image, process_queue
 
 app = FastAPI(title="YOLOv8 Edge API")
 
 model: YOLO = YOLO("/models/yolov8n.pt")
 
-DB_PATH = "/app/detections.db"
-db: DbUtil = DbUtil(DB_PATH)
+# Initialize singletons using config paths
+model: YOLO = YOLO(settings.MODEL_PATH)
+db: DbUtil = DbUtil(settings.DB_PATH)
+storage: ImageStorage = ImageStorage(settings.IMAGE_DIR)
 
-IMAGE_BUCKET_BASE_DIR = "/app/images"
-storage: ImageStorage = ImageStorage(IMAGE_BUCKET_BASE_DIR)
+@app.on_event("startup")
+async def startup_event():
+    os.makedirs(settings.LOG_DIR, exist_ok=True)
+    asyncio.create_task(process_queue())
+
+@app.post("/stream")
+async def stream_image(file: UploadFile = File(...)):
+    """Receive images and enqueue them for background processing."""
+    contents = await file.read()
+    await enqueue_image(contents, file.filename)
+    return {
+        "message": f"{file.filename} queued for detection"
+    }
 
 @app.post("/detect")
 async def detect(
