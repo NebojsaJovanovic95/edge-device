@@ -8,6 +8,7 @@ from typing import Any
 
 from src.DbUtil import DbUtil
 from src.ImageStorage import ImageStorage
+from src.Util import DetectionResponse
 
 app = FastAPI(title="YOLOv8 Edge API")
 
@@ -59,7 +60,7 @@ async def get_all_detections() -> JSONResponse:
     )
 
 @app.get("/detection/{id}")
-async def get_detection(id: int) -> StreamingResponse | JSONResponse:
+async def get_detection(id: int):
     detection = db.get_detection_by_id(id)
     if detection is None:
         raise HTTPException(
@@ -68,7 +69,7 @@ async def get_detection(id: int) -> StreamingResponse | JSONResponse:
         )
     
     image_path: str = detection["image_path"]
-    detection_data: list[dict[std, Any]] = json.loads(detection["detection_data"])
+    detection_data: list[dict[str, Any]] = json.loads(detection["detection_data"])
 
     def image_stream() -> Any:
         with storage.load_image(image_path) as image_file:
@@ -83,5 +84,4 @@ async def get_detection(id: int) -> StreamingResponse | JSONResponse:
         })
 
 if __name__ == "__main__":
-    init_db()
     uvicorn.run(app, host="0.0.0.0", port=5000)

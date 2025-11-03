@@ -1,5 +1,5 @@
 from __future__ import annotations
-from pathlib import pathlib
+from pathlib import Path
 from typing import BinaryIO
 import shutil
 import os
@@ -15,7 +15,7 @@ class ImageStorage:
     ) -> None:
         self.base_dir: Path = Path(base_dir)
         self.base_dir.mkdir(
-            parents-True,
+            parents=True,
             exist_ok=True
         )
     

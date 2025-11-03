@@ -30,6 +30,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy app source
 COPY ./app /app
 
+RUN mkdir -p /models /app/images
+
+RUN python -c "from ultralytics import YOLO; YOLO('yolov8n.pt').model.save('/models/yolov8n.pt')" || true
+
 # Expose the FastAPI port
 EXPOSE 5000
 
