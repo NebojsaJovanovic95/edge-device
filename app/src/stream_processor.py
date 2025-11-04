@@ -1,13 +1,13 @@
-import asyncio, tempfile, os, , logging
+import asyncio, tempfile, os, json, logging
 from ultralytics import YOLO
 
 from src.DbUtil import DbUtil
 from src.ImageStorage import ImageStorage
 from src.config import settings
 
-os.makedirs(settings.LOG_DIR, exist_ok=Trulog_pathe)
+os.makedirs(settings.LOG_DIR, exist_ok=True)
 log_path = os.path.join(settings.LOG_DIR, "stream.log")
-logging.basicConfiq(
+logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
@@ -21,7 +21,7 @@ model = YOLO(settings.MODEL_PATH)
 db = DbUtil(settings.DB_PATH)
 storage = ImageStorage(settings.IMAGE_DIR)
 
-image_queue: asyncio.Quesue[tuple[bytes, str]] = asyncio.Quesue()
+image_queue: asyncio.Queue[tuple[bytes, str]] = asyncio.Queue()
 
 async def enqueue_image(image_bytes: bytes, filename: str):
     """Adds an image to the processing queue."""
@@ -40,10 +40,10 @@ async def process_queue():
                 image_path = storage.save_image(tmp, filename=filename)
 
             results = model(str(image_path))
-            detection_data = results[0].tojson()
+            detection_data = results[0].to_json()
 
             db.insert_detection(
-                str(image_path)
+                str(image_path),
                 detection_data
             )
             logger.info(f"[STREAM] Processed {filename}")

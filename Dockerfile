@@ -30,13 +30,16 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy app source
 COPY ./app /app
 
-RUN mkdir -p /models /app/images /app/logs
+RUN mkdir -p /models /app/images /app/logs && chmod -R 777 /models /app/images /app/logs
 
 # Pre-download YOLOv8 model to /models
-RUN python -c "from ultralytics import YOLO; model = YOLO('yolov8n.pt'); import shutil; shutil.copy('yolov8n.pt', '/models/yolov8n.pt')"
+RUN python -c "from ultralytics import YOLO; model = YOLO('yolov8n.pt'); \
+    import shutil; shutil.copy('yolov8n.pt', '/models/yolov8n.pt')"
 
 # Expose the FastAPI port
 EXPOSE 5000
 
 # Run the FastAPI app using uvicorn
-CMD ["uvicorn", "yolov8_api:app", "--host", "0.0.0.0", "--port", "5000"]
+CMD bash -c "mkdir -p /models /app/images /app/logs \
+    && chmod -R 777 /models /app/images /app/logs \
+    && exec uvicorn yolov8_api:app --host 0.0.0.0 --port 5000"

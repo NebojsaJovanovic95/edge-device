@@ -2,18 +2,17 @@
 FROM python:3.12-slim
 
 # Set working directory
-WORKDIR /app_test
-
-# Create a directory inside the container for outputs
-RUN mkdir -p /app/output
 WORKDIR /app
 
-# Copy your test script and requirements
+# Create a directory for outputs inside the working directory
+RUN mkdir -p /app/output
+
+# Copy your test script, requirements, and test image
 COPY test_post.py .
 COPY requirements.test.txt .
 COPY test.jpg .
 
-# Install only the packages needed for this client
+# Install required Python packages
 RUN pip install --no-cache-dir -r requirements.test.txt
 
 # Command to run your test script
