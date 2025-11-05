@@ -64,7 +64,7 @@ async def detect(
             "id": detection_id,
             "image": file.filename,
             "path": str(image_path),
-            "detection": results[0].tojson()
+            "detection": json.loads(detection_data)
         }
     )
 
