@@ -8,9 +8,9 @@ WORKDIR /app
 RUN mkdir -p /app/output
 
 # Copy your test script, requirements, and test image
-COPY test_post.py .
+COPY test_app/*.py .
 COPY requirements.test.txt .
-COPY test.jpg .
+COPY test_app/test.jpg .
 
 # Install required Python packages
 RUN pip install --no-cache-dir -r requirements.test.txt
