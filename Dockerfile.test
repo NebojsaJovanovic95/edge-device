@@ -6,6 +6,7 @@ WORKDIR /app
 
 # Create a directory for outputs inside the working directory
 RUN mkdir -p /app/output
+RUN chmod -R 777 /app/output
 
 # Copy your test script, requirements, and test image
 COPY test_app/*.py .

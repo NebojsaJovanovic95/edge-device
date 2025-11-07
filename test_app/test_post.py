@@ -29,6 +29,6 @@ else:
     detections = []
 
 draw_detection(
-    image_path=="test.jpg",
+    image_path="test.jpg",
     detections=detections
 )
