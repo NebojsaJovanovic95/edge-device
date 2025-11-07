@@ -82,6 +82,7 @@ async def get_detection(id: int):
             status_code=404,
             detail="Detection not found"
         )
+    print(f"Fetched detection: s{detection}")
     
     image_path: str = detection["image_path"]
     detection_data: list[dict[str, Any]] = json.loads(detection["detection_data"])
