@@ -20,17 +20,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN ln -fs /usr/share/zoneinfo/Europe/Belgrade /etc/localtime && \
     dpkg-reconfigure --frontend noninteractive tzdata
 
-# Copy requirements first to leverage Docker caching
 COPY requirements.txt .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy app source
 COPY ./app /app
 
-RUN mkdir -p /models /app/images /app/logs && chmod -R 777 /models /app/images /app/logs
+RUN mkdir -p /models /app/images /app/logs \
+    && chmod -R 777 /models /app/images /app/logs
 
 # Pre-download YOLOv8 model to /models
 RUN python -c "from ultralytics import YOLO; model = YOLO('yolov8n.pt'); \

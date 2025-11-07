@@ -1,34 +1,17 @@
-import requests
-import json
+import test_detection
+import test_detection_id
+import test_detections
+import test_stream
 
-from util import draw_detection
+def main():
+    print("Runnning /detect test...")
+    id = test_detection.run_test()
+    print(f"Runnning /detection/{id} test...")
+    test_detection_id.run_test(id=id)
+    print("Runnning /detections test...")
+    test_detections.run_test()
+    print("Runnning /stream test...")
+    test_stream.run_test()
 
-
-log_file = "/app/output/detections.log"
-
-def log(msg):
-    with open(log_file, "a") as f:
-        f.write(msg + "\n")
-
-url = "http://yolov8_server:5000/detect"
-image_path = "test.jpg"
-
-with open(image_path, "rb") as f:
-    files = {"file": f}
-    response = requests.post(url, files=files)
-
-print(f"{type(response)} \n {response}")
-
-if response.status_code == 200:
-    data = response.json()
-    detections = data["detection"]
-    id = data["id"]
-
-else:
-    print("Error:", response.status_code, response.text)
-    detections = []
-
-draw_detection(
-    image_path="test.jpg",
-    detections=detections
-)
+if __name__ == "__main__":
+    main()

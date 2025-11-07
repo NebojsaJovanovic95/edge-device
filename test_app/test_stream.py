@@ -1,10 +1,12 @@
 import requests
 
-url_stream = "http://yolov8_server:5000/stream"
-image_path = "test.jpg"
+SERVER_URL = "http://yolov8_server:5000"
+TEST_IMAGE = "test.jpg"
 
-with open(image_path, "rb") as f:
-    files = {"file": f}
-    response = requests.post(url_stream, files=files)
-
-print(response.status_code, response.json())
+def run_test():
+    with open(TEST_IMAGE, "rb") as f:
+        files = {"file": f}
+        response = requests.post(f"{SERVER_URL}/stream", files=files)
+    
+    print("Status code:", response.status_code)
+    print("Response:", response.json())
