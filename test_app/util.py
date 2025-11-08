@@ -9,7 +9,8 @@ def log(msg):
 
 def draw_detection(
     image_path: str,
-    detections: list[dict[str, Any]]
+    detections: list[dict[str, Any]],
+    output_path: str = "/app/output/output_with_boxes.jpg"
 ) -> None:
     img = cv2.imread(image_path)
 
@@ -54,6 +55,5 @@ def draw_detection(
             1
         )
 
-    output_path = "/app/output/output_with_boxes.jpg"
     cv2.imwrite(output_path, img)
     log(f"Saved detections to {output_path}")
