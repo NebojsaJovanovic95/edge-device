@@ -11,6 +11,12 @@ class Settings(BaseSettings):
 
     YOLO_CONFIDENCE_THRESHOLD: float = 0.25
 
+    USE_MINIO: bool = True
+    MINIO_ENDPOINT: str = "http://minio:9000"
+    MINIO_ACCESS_KEY: str = "minio_access_key"
+    MINIO_SECRET_KEY: str = "minio_secret_key"
+    MINIO_BUCKET: str = "processed-images"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

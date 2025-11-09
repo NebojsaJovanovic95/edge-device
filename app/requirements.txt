@@ -8,3 +8,5 @@ pillow
 pandas==2.2.2
 python-multipart
 pydantic-settings
+boto3
+botocore

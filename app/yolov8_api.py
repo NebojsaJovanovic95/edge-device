@@ -8,8 +8,8 @@ from typing import Any
 
 from src.config import settings
 from src.DbUtil import DbUtil
-from src.ImageStorage import ImageStorage
-from src.Util import DetectionResponse
+from src.image_storage import ImageStorage
+from src.util import DetectionResponse
 from src.stream_processor import enqueue_image, process_queue
 
 app = FastAPI(title="YOLOv8 Edge API")
@@ -19,7 +19,14 @@ model: YOLO = YOLO("/models/yolov8n.pt")
 # Initialize singletons using config paths
 model: YOLO = YOLO(settings.MODEL_PATH)
 db: DbUtil = DbUtil(settings.DB_PATH)
-storage: ImageStorage = ImageStorage(settings.IMAGE_DIR)
+storage: ImageStorage = ImageStorage(
+    base_dir=settings.IMAGE_DIR,
+    use_minio=settings.USE_MINIO,
+    minio_endpoint=settings.MINIO_ENDPOINT,
+    minio_access_key=settings.MINIO_ACCESS_KEY,
+    minio_secret_key=settings.MINIO_SECRET_KEY,
+    minio_bucket=settings.MINIO_BUCKET
+)
 
 @app.on_event("startup")
 async def startup_event():

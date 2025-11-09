@@ -1,4 +1,6 @@
 # Build
+## minio
+podman build -t minio -f Dockerfile minio/.
 ## yolov8_server
 podman build -t yolov8_server -f Dockerfile app/.
 ## yolov8_client
@@ -8,8 +10,21 @@ podman build -t image_stream -f Dockerfile streaming_app/.
 # Run
 ## podman network
 podman network create yolov8_net
+## minio
+podman run -d --replace \
+    --name minio \
+    --network yolov8_net \
+    --env-file minio/minio.env \
+    -p 9000:9000 \
+    -p 9001:9001 \
+    -v minio_data:/data \
+    minio
 ## yolov8_server
-podman run -d --rm --replace --name yolov8_server --network yolov8_net -p 5000:5000 yolov8_server
+podman run -d --replace --name yolov8_server \
+    --network yolov8_net \
+    -v $(pwd)/logs:/app/logs \
+    -p 5000:5000 \
+    yolov8_server
 ## yolov8_client
 podman run -d --replace --name yolov8_client \
     --network yolov8_net \
