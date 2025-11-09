@@ -24,7 +24,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-COPY ./app /app
+COPY . /app
 
 RUN mkdir -p /models /app/images /app/logs \
     && chmod -R 777 /models /app/images /app/logs

@@ -9,9 +9,9 @@ RUN mkdir -p /app/output
 RUN chmod -R 777 /app/output
 
 # Copy your test script, requirements, and test image
-COPY test_app/*.py .
+COPY *.py .
 COPY requirements.test.txt .
-COPY test_app/test.jpg .
+COPY test.jpg .
 
 # Install required Python packages
 RUN pip install --no-cache-dir -r requirements.test.txt
