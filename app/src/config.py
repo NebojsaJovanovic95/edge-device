@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     MINIO_BUCKET: str = "processed-images"
 
     POSTGRES_TABLE_NAME: str = "detections"
+    POSTGRES_DSN: str = ""
 
     REDIS_HOST: str = "redis"
     REDIS_PORT: str = 6379

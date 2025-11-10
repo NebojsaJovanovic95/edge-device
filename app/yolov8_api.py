@@ -7,7 +7,7 @@ import uvicorn, asyncio, tempfile, os, json
 from typing import Any
 
 from src.config import settings
-from src.db_util import DbUtil
+from src.db_util import DetectionDb
 from src.image_storage import ImageStorage
 from src.util import DetectionResponse
 from src.stream_processor import enqueue_image, process_queue
@@ -16,11 +16,12 @@ from src.redis_client import redis_client
 
 app = FastAPI(title="YOLOv8 Edge API")
 
-model: YOLO = YOLO("/models/yolov8n.pt")
-
 # Initialize singletons using config paths
 model: YOLO = YOLO(settings.MODEL_PATH)
-db: DbUtil = DbUtil(settings.DB_PATH)
+db: DetectionDb = DetectionDb(
+    postgres_dsn=settings.POSTGRES_DSN,
+    sqlite_path=settings.CACHE_DB_PATH
+)
 storage: ImageStorage = ImageStorage(
     base_dir=settings.IMAGE_DIR,
     use_minio=settings.USE_MINIO,
@@ -64,7 +65,7 @@ async def detect(
 
     detection_id = db.insert_detection(
         str(image_path),
-        detection_data
+        json.loads(detection_data)
     )
 
     return JSONResponse(
@@ -80,7 +81,7 @@ async def detect(
 @app.get("/detections")
 async def get_all_detections() -> JSONResponse:
     return JSONResponse(
-        {"detections": db.get_all_detections()}
+        {"detections": db.get_recent(limit=20)}
     )
 
 @app.get("/detection/{id}")

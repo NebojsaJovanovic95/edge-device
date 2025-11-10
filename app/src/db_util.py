@@ -2,14 +2,14 @@ from __future__ import annotations
 from typing import Any, Optional, List
 import json
 import time
-
 import sqlite3
-
+import threading
+import logging
 import psycopg2
 from psycopg2.extras import RealDictCursor
-
 from src.config import settings
 
+logger = logging.getLogger(__name__)
 
 class BaseDb:
     """Base class storing common SQL strings and helper logic."""
@@ -18,6 +18,7 @@ class BaseDb:
     COL_IMAGE_PATH = "image_path"
     COL_DETECTION_DATA = "detection_data"
     COL_CREATED_AT = "created_at"
+    COL_SYNCED = "synced"
 
     SQL_INSERT = (
         "INSERT INTO {table} ({image_col}, {data_col}, {ts_col}) "
@@ -63,34 +64,50 @@ class SqliteDb(BaseDb):
             {BaseDb.COL_ID} INTEGER PRIMARY KEY AUTOINCREMENT,
             {BaseDb.COL_IMAGE_PATH} TEXT NOT NULL,
             {BaseDb.COL_DETECTION_DATA} TEXT NOT NULL,
-            {BaseDb.COL_CREATED_AT} REAL NOT NULL
+            {BaseDb.COL_CREATED_AT} REAL NOT NULL,
+            {BaseDb.COL_SYNCED} INTEGER DEFAULT 0
         )
     """
 
-    SQL_INSERT_WIH_ID = f"""
+    SQL_SELECT_UNSYNCED = f"""
+        SELECT * FROM {SQLITE_TABLE_NAME} WHERE {BaseDb.COL_SYNCED}=0
+        ORDER BY {BaseDb.COL_CREATED_AT} ASC
+    """
+
+    SQL_UPDATE_SYNCED = f"""
+        UPDATE {SQLITE_TABLE_NAME} SET {BaseDb.COL_ID}=?, {BaseDb.COL_SYNCED}=1
+        WHERE rowid=?
+    """
+
+    SQL_INSERT = f"""
+        INSERT INTO {SQLITE_TABLE_NAME} (
+            {BaseDb.COL_IMAGE_PATH},
+            {BaseDb.COL_DETECTION_DATA},
+            {BaseDb.COL_CREATED_AT},
+            {BaseDb.COL_SYNCED}
+        )
+        VALUES (?, ?, ?, 0)
+    """
+
+    SQL_INSERT_WITH_ID = f"""
         INSERT INTO {SQLITE_TABLE_NAME} (
             {BaseDb.COL_ID},
             {BaseDb.COL_IMAGE_PATH},
             {BaseDb.COL_DETECTION_DATA},
-            {BaseDb.COL_CREATED_AT}
+            {BaseDb.COL_CREATED_AT},
+            {BaseDb.COL_SYNCED}
         )
-        VALUES (?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, 1)
     """
 
     SQL_SELECT_BY_ID = f"""
-        SELECT {BaseDb.COL_ID},
-        {BaseDb.COL_IMAGE_PATH},
-        {BaseDb.COL_DETECTION_DATA},
-        {BaseDb.COL_CREATED_AT}
+        SELECT *
         FROM {SQLITE_TABLE_NAME}
         WHERE {BaseDb.COL_ID}=?
     """
 
     SQL_SELECT_RECENT = f"""
-        SELECT {BaseDb.COL_ID},
-        {BaseDb.COL_IMAGE_PATH},
-        {BaseDb.COL_DETECTION_DATA},
-        {BaseDb.COL_CREATED_AT}
+        SELECT *
         FROM {SQLITE_TABLE_NAME}
         ORDER BY {BaseDb.COL_CREATED_AT} DESC
         LIMIT ?
@@ -101,14 +118,14 @@ class SqliteDb(BaseDb):
         WHERE {BaseDb.COL_ID} NOT IN (
             SELECT {BaseDb.COL_ID}
             FROM {SQLITE_TABLE_NAME}
-            ORDERED BY {BaseDb.COL_CREATED_AT} DESC
+            ORDER BY {BaseDb.COL_CREATED_AT} DESC
             LIMIT ?
         )
     """
 
     def __init__(
         self,
-        db_path: str = "app/cache.db"
+        db_path: str = settings.CACHE_DB_PATH
     ):
         self.db_path = db_path
         self._init_db()
@@ -125,19 +142,33 @@ class SqliteDb(BaseDb):
         self,
         image_path: str,
         detection_data: dict[str, Any],
-        ts: Optional[int] = None
+        ts: Optional[int] = None,
+        id_override: Optional[int] = None
     ) -> int:
         ts = ts or int(time.time())
         with self._get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                self.SQL_INSERT,
-                (
-                    image_path,
-                    json.dumps(detection_data),
-                    ts
+            if id_override:
+                cursor.execute(
+                    self.SQL_INSERT_WITH_ID,
+                    (
+                        id_override,
+                        image_path,
+                        json.dumps(detection_data),
+                        ts
+                    )
                 )
-            )
+                conn.commit()
+                return id_override
+            else:
+                cursor.execute(
+                    self.SQL_INSERT,
+                    (
+                        image_path,
+                        json.dumps(detection_data),
+                        ts
+                    )
+                )
             conn.commit()
             return cursor.lastrowid
 
@@ -153,6 +184,17 @@ class SqliteDb(BaseDb):
             )
             row = cursor.fetchone()
             return dict(row) if row else None
+
+    def get_unsynced(self) -> List[dict]:
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(self.SQL_SELECT_UNSYNCED)
+            return [dict(r) for r in cursor.fetchall()]
+
+    def mark_synced(self, local_rowid: int, new_id: int):
+        with self._get_conn() as conn:
+            conn.execute(self.SQL_UPDATE_SYNCED, (new_id, local_rowid))
+            conn.commit()
 
     def get_recent(
         self,
@@ -214,7 +256,7 @@ class PostgresDb(BaseDb):
                     )
                 )
                 conn.commit()
-                return cur.fetchone()[BaseDb.COL_ID]
+                return cur.fetchone()[0]
 
     def get_detection_by_id(
         self,
@@ -230,12 +272,12 @@ class PostgresDb(BaseDb):
                 row = cur.fetchone()
                 if row:
                     return {
-                        self.COL_ID: row[BaseDb.COL_ID],
-                        self.COL_IMAGE_PATH: row[BaseDb.COL_IMAGE_PATH],
+                        self.COL_ID: row[0],
+                        self.COL_IMAGE_PATH: row[1],
                         self.COL_DETECTION_DATA: json.loads(
-                            row[BaseDb.COL_DETECTION_DATA]
+                            row[2]
                         ),
-                        self.COL_CREATED_AT: row[BaseDb.COL_CREATED_AT]
+                        self.COL_CREATED_AT: row[3]
                     }
                 return None
 
@@ -250,30 +292,32 @@ class PostgresDb(BaseDb):
                 rows = cur.fetchall()
                 return [
                     {
-                        self.COL_ID: row[BaseDb.COL_ID],
-                        self.COL_IMAGE_PATH: row[BaseDb.COL_IMAGE_PATH],
+                        self.COL_ID: row[0],
+                        self.COL_IMAGE_PATH: row[1],
                         self.COL_DETECTION_DATA: json.loads(
-                            row[BaseDb.COL_DETECTION_DATA]
+                            row[2]
                         ),
-                        self.COL_CREATED_AT: row[BaseDb.COL_CREATED_AT]
+                        self.COL_CREATED_AT: row[3]
                     }
                     for row in rows
                 ]
             
 
 class DetectionDb:
-    """High-level interface combining Postgres + SQLite cache."""
+    """High-level interface combining Postgres + SQLite cache with offline handling."""
 
     def __init__(
         self,
         postgres_dsn: str,
-        sqlite_path: str = settings.CACHE_DB_PATH
+        sqlite_path: str
     ):
         self.cache = SqliteDb(sqlite_path)
         self.main_db = PostgresDb(
             postgres_dsn,
             table_name=settings.POSTGRES_TABLE_NAME
         )
+        self.cache.prune_cache(max_rows=100)
+        self._start_sync_thread()
 
     def insert_detection(
         self,
@@ -282,17 +326,27 @@ class DetectionDb:
     ) -> int:
         """Insert into both cache and main DB."""
         ts: int = int(time.time())
-        self.cache.insert_detection(
+        local_id = self.cache.insert_detection(
             image_path,
             detection_data,
             ts
         )
-        pg_id: int = self.main_db.insert_detection(
-            image_path,
-            detection_data,
-            ts
-        )
-        return pg_id
+        try:
+            pg_id = self.main_db.insert_detection(
+                image_path,
+                detection_data,
+                ts
+            )
+            self.cache.mark_synced(
+                local_id,
+                pg_id
+            )
+            return pg_id
+        except Exception as e:
+            logger.warning(
+                f"Postgres insert failed: {e}, keeping local cache ID {local_id}"
+            )
+            return local_id
 
     def get_detection_by_id(
         self,
@@ -311,5 +365,49 @@ class DetectionDb:
             )
         return record
 
-    def get_recent(self, limit: int = 10) -> list[dict]:
+    def get_recent(self, limit: int = 10) -> List[dict]:
         return self.cache.get_recent(limit)
+    
+    def _sync_unsynced(self):
+        """Background thread to push unsynced cache rows to Postgres."""
+        delay = 5
+        while True:
+            unsynced = self.cache.get_unsynced()
+            synced_any = False
+            for row in unsynced:
+                try:
+                    pg_id = self.main_db.insert_detection(
+                        image_path=row[BaseDb.COL_IMAGE_PATH],
+                        detection_data=json.loads(row[BaseDb.COL_DETECTION_DATA]),
+                        ts=row[BaseDb.COL_CREATED_AT]
+                    )
+                    self.cache.mark_synced(row['id'], pg_id)
+                    logger.info(
+                        f"Synced local row {row['id']} -> Postgres ID {pg_id}"
+                    )
+                    synced_any = True
+                    delay = 5
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to sync local row {row['id']} to Postgres: {e}"
+                    )
+                    delay = min(delay * 2, 300)
+                    break
+            if synced_any:
+                try:
+                    self.cache.prune_cache(max_rows=100)
+                    logger.debug(
+                        "Cache pruned to keep only 100 most recent rows."
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Cache pruning failed: {e}"
+                    )
+            time.sleep(delay)
+    
+    def _start_sync_thread(self):
+        t = threading.Thread(
+            target=self._sync_unsynced,
+            daemon=True
+        )
+        t.start()

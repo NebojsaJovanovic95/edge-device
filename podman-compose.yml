@@ -42,31 +42,6 @@ services:
       timeout: 5s
       retries: 5
 
-  yolov8_server:
-    build: ./app
-    container_name: yolov8_server
-    env_file:
-      - .env
-      - .env.private
-    volumes:
-      - ./app:/app:Z
-      - ./output:/app/output:Z
-      - ./logs:/app/logs:Z
-    ports:
-      - "5000:5000"
-    networks:
-      - yolov8_net
-    depends_on:
-      - postgres
-      - minio
-      - redis
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   redis:
     image: docker.io/redis:7
     container_name: redis
@@ -76,8 +51,41 @@ services:
       - yolov8_net
     restart: unless-stopped
 
+  yolov8_server:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: yolov8_server
+    env_file:
+      - .env
+      - .env.private
+    volumes:
+      - ./app:/app:Z
+      - ./output:/app/output:Z
+      - ./logs:/app/logs:Z
+      - ./models:/models:Z
+    ports:
+      - "5000:5000"
+    networks:
+      - yolov8_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   streaming_app:
-    build: ./streaming_app
+    build:
+      context: ./streaming_app
+      dockerfile: Dockerfile
     container_name: streaming_app
     env_file:
       - .env
@@ -85,7 +93,7 @@ services:
     volumes:
       - ./streaming_app:/app:Z
       - ./logs:/app/logs:Z
-      - ./images:/app/images:logs:Z
+      - ./images:/app/images:Z
     networks:
       - yolov8_net
     depends_on:
@@ -93,7 +101,9 @@ services:
     restart: unless-stopped
 
   test_app:
-    build: ./test_app
+    build:
+      context: ./test_app
+      dockerfile: Dockerfile
     container_name: test_app
     env_file:
       - .env
@@ -110,4 +120,3 @@ services:
 networks:
   yolov8_net:
     driver: bridge
-
