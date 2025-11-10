@@ -2,9 +2,11 @@ version: "3.9"
 
 services:
   minio:
-    image: ./minio
+    image: docker.io/minio/minio:latest
     container_name: minio
-    env_file: ./minio/minio.env
+    env_file:
+      - .env
+      - .env.private
     volumes:
       - ./data:/data:Z
     ports:
@@ -13,32 +15,99 @@ services:
     command: server /data --console-address ":9001"
     networks:
       - yolov8_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   postgres:
-    build: ./postgres  # your Dockerfile location
+    image: docker.io/postgres:latest
     container_name: postgres
-    env_file: ./postgres/postgres.env
+    env_file:
+      - .env
+      - .env.private
     volumes:
-      - postgres_data:/var/lib/postgresql/data:Z
+      - ./postgres_data:/var/lib/postgresql/data:Z
+      - ./db_init:/docker-entrypoint-initdb.d:Z
     ports:
       - "5432:5432"
     networks:
       - yolov8_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   yolov8_server:
-    build: ./yolov8_server
+    build: ./app
     container_name: yolov8_server
+    env_file:
+      - .env
+      - .env.private
     volumes:
+      - ./app:/app:Z
       - ./output:/app/output:Z
+      - ./logs:/app/logs:Z
+    ports:
+      - "5000:5000"
     networks:
       - yolov8_net
     depends_on:
       - postgres
       - minio
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-volumes:
-  postgres_data:
+  redis:
+    image: docker.io/redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - yolov8_net
+    restart: unless-stopped
+
+  streaming_app:
+    build: ./streaming_app
+    container_name: streaming_app
+    env_file:
+      - .env
+      - .env.private
+    volumes:
+      - ./streaming_app:/app:Z
+      - ./logs:/app/logs:Z
+      - ./images:/app/images:logs:Z
+    networks:
+      - yolov8_net
+    depends_on:
+      - yolov8_server
+    restart: unless-stopped
+
+  test_app:
+    build: ./test_app
+    container_name: test_app
+    env_file:
+      - .env
+      - .env.private
+    volumes:
+      - ./test_app:/app:Z
+      - ./logs:/app/logs:Z
+    networks:
+      - yolov8_net
+    depends_on:
+      - yolov8_net
+    restart: unless-stopped
 
 networks:
   yolov8_net:
     driver: bridge
+

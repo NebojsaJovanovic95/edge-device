@@ -1,9 +1,11 @@
-import asyncio, tempfile, os, json, logging
+import asyncio, tempfile, os, logging, pickle
 from ultralytics import YOLO
 
-from src.DbUtil import DbUtil
+from src.db_util import DbUtil
 from src.image_storage import ImageStorage
 from src.config import settings
+
+from src.redis_client import redis_client
 
 NAME = "STREAM"
 
@@ -21,10 +23,12 @@ logger = logging.getLogger("stream_processor")
 
 model = YOLO(settings.MODEL_PATH)
 db = DbUtil(settings.DB_PATH)
+
 local_storage: ImageStorage = ImageStorage(
     base_dir=settings.IMAGE_DIR,
     use_minio=False
 )
+
 minio_storage: ImageStorage = ImageStorage(
     base_dir=settings.IMAGE_DIR,
     use_minio=settings.USE_MINIO,
@@ -34,23 +38,41 @@ minio_storage: ImageStorage = ImageStorage(
     minio_bucket=settings.MINIO_BUCKET
 )
 
-image_queue: asyncio.Queue[tuple[bytes, str]] = asyncio.Queue()
-
 async def enqueue_image(image_bytes: bytes, filename: str):
-    """Adds an image to the processing queue."""
-    await image_queue.put((image_bytes, filename))   
+    """Adds an image to redis queue as aserialized tuple."""
+    data = pickle.dumps((image_bytes, filename))
+    await redis_client.rpush(
+        settings.REDIS_QUEUE_KEY,
+        data
+    )
     logging.info(f"[{NAME}] Queued image: {filename}") 
 
 async def process_queue():
-    """Continuously process images from the queue."""
-    logger.info(f"[{NAME}] Starting background YOLO worker...")
+    """Continuously process images from Redis queue."""
+    logger.info(f"[{NAME}] Starting Redis YOLO worker...")
     while True:
-        image_bytes, filename = await image_queue.get()
+        data = await redis_cleint.blpop(
+            settings.REDIS_QUEUE_KEY,
+            timeout=5
+        )
+        if data is None:
+            await asyncio.sleep(0.1)
+            continue
+
+        _, serialized = data
         try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+            image_bytes, filename = pickle.loads(serialized)
+
+            with tempfile.NamedTemporaryFile(
+                delete=False,
+                suffix=".jpg"
+            ) as tmp:
                 tmp.write(image_bytes)
                 tmp.seek(0)
-                local_path = local_storage.save_image(tmp, filename=filename)
+                local_path = local_storage.save_image(
+                    tmp,
+                    filename=filename
+                )
 
             results = model(str(local_path))
             detection_data = results[0].to_json()
@@ -68,5 +90,3 @@ async def process_queue():
         
         except Exception as e:
             logger.info(f"[{NAME}] Error processing {filename}: {e}")
-        finally:
-            image_queue.task_done()

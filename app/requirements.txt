@@ -10,3 +10,5 @@ python-multipart
 pydantic-settings
 boto3
 botocore
+redis>=5.0.0
+psycopg2

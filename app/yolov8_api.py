@@ -7,10 +7,12 @@ import uvicorn, asyncio, tempfile, os, json
 from typing import Any
 
 from src.config import settings
-from src.DbUtil import DbUtil
+from src.db_util import DbUtil
 from src.image_storage import ImageStorage
 from src.util import DetectionResponse
 from src.stream_processor import enqueue_image, process_queue
+
+from src.redis_client import redis_client
 
 app = FastAPI(title="YOLOv8 Edge API")
 
