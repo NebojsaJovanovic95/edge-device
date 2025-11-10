@@ -18,10 +18,10 @@ class ImageStorage:
         self,
         base_dir: str,
         use_minio: bool,
-        minio_endpoint: str,
-        minio_access_key: str,
-        minio_secret_key: str,
-        minio_bucket: str,
+        minio_endpoint: str = "",
+        minio_access_key: str = "",
+        minio_secret_key: str = "",
+        minio_bucket: str = "",
     ) -> None:
         self.base_dir: Path = Path(base_dir)
         self.use_minio = use_minio

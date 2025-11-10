@@ -25,6 +25,7 @@ def run_test():
     else:
         print("Error:", response.status_code, response.text)
         detections = []
+        id = -1
 
     draw_detection(
         image_path="test.jpg",

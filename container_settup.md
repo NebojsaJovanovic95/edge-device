@@ -1,6 +1,8 @@
 # Build
 ## minio
 podman build -t minio -f Dockerfile minio/.
+## postgres
+podman build -t custom_postgres .
 ## yolov8_server
 podman build -t yolov8_server -f Dockerfile app/.
 ## yolov8_client
@@ -14,11 +16,19 @@ podman network create yolov8_net
 podman run -d --replace \
     --name minio \
     --network yolov8_net \
-    --env-file minio/minio.env \
+    --env-file $(pwd)/minio/minio.env \
     -p 9000:9000 \
     -p 9001:9001 \
-    -v minio_data:/data \
+    -v $(pwd)/data:/data:Z \
     minio
+# postgres
+podman run -d --replace \
+    --name postgres \
+    --network yolov8_net \
+    --env-file $(pwd)/postgres.env \
+    -v $(pwd)/postgres_data:/var/lib/postgresql/data:Z \
+    -p 5432:5432 \
+    custom_postgres
 ## yolov8_server
 podman run -d --replace --name yolov8_server \
     --network yolov8_net \
