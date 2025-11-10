@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  minio:
+    image: ./minio
+    container_name: minio
+    env_file: ./minio/minio.env
+    volumes:
+      - ./data:/data:Z
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    networks:
+      - yolov8_net
+
+  postgres:
+    build: ./postgres  # your Dockerfile location
+    container_name: postgres
+    env_file: ./postgres/postgres.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data:Z
+    ports:
+      - "5432:5432"
+    networks:
+      - yolov8_net
+
+  yolov8_server:
+    build: ./yolov8_server
+    container_name: yolov8_server
+    volumes:
+      - ./output:/app/output:Z
+    networks:
+      - yolov8_net
+    depends_on:
+      - postgres
+      - minio
+
+volumes:
+  postgres_data:
+
+networks:
+  yolov8_net:
+    driver: bridge
