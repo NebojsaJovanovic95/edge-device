@@ -29,7 +29,7 @@ services:
       - .env
       - .env.private
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data:Z
+      - ./postgres_data:/var/lib/postgresql:Z
       - ./db_init:/docker-entrypoint-initdb.d:Z
     ports:
       - "5432:5432"
@@ -60,7 +60,6 @@ services:
       - .env
       - .env.private
     volumes:
-      - ./app:/app:Z
       - ./output:/app/output:Z
       - ./logs:/app/logs:Z
       - ./models:/models:Z
@@ -91,7 +90,6 @@ services:
       - .env
       - .env.private
     volumes:
-      - ./streaming_app:/app:Z
       - ./logs:/app/logs:Z
       - ./images:/app/images:Z
     networks:
@@ -109,7 +107,6 @@ services:
       - .env
       - .env.private
     volumes:
-      - ./test_app:/app:Z
       - ./logs:/app/logs:Z
     networks:
       - yolov8_net
