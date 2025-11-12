@@ -45,6 +45,11 @@ async def stream_image(file: UploadFile = File(...)):
         "message": f"{file.filename} queued for detection"
     }
 
+@app.get("/health")
+async def health_check():
+    """Health check, returns 200 if the app is running."""
+    return {"status": "healthy"}
+
 @app.post("/detect")
 async def detect(
     file: UploadFile = File(...)

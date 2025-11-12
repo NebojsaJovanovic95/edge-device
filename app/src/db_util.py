@@ -411,3 +411,8 @@ class DetectionDb:
             daemon=True
         )
         t.start()
+
+db: DetectionDb = DetectionDb(
+    postgres_dsn=settings.POSTGRES_DSN,
+    sqlite_path=settings.CACHE_DB_PATH
+)

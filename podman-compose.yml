@@ -60,9 +60,8 @@ services:
       - .env
       - .env.private
     volumes:
-      - ./output:/app/output:Z
       - ./logs:/app/logs:Z
-      - ./models:/models:Z
+      - ./models:/app/models:Z
     ports:
       - "5000:5000"
     networks:
@@ -96,24 +95,27 @@ services:
       - yolov8_net
     depends_on:
       - yolov8_server
+      - redis
     restart: unless-stopped
 
-  test_app:
-    build:
-      context: ./test_app
-      dockerfile: Dockerfile
-    container_name: test_app
-    env_file:
-      - .env
-      - .env.private
-    volumes:
-      - ./logs:/app/logs:Z
-    networks:
-      - yolov8_net
-    depends_on:
-      - yolov8_net
-    restart: unless-stopped
+  # test_app:
+  #   build:
+  #     context: ./test_app
+  #     dockerfile: Dockerfile
+  #   container_name: test_app
+  #   env_file:
+  #     - .env
+  #     - .env.private
+  #   volumes:
+  #     - ./logs:/app/logs:Z
+  #   networks:
+  #     - yolov8_net
+  #   depends_on:
+  #     - yolov8_server
+  #     - redis
+  #   restart: unless-stopped
 
 networks:
   yolov8_net:
+    name: yolov8_net
     driver: bridge

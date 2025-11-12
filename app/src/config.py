@@ -13,21 +13,24 @@ class Settings(BaseSettings):
 
     USE_MINIO: bool = True
     MINIO_ENDPOINT: str = "http://minio:9000"
-    MINIO_ACCESS_KEY: str = "minio_access_key"
-    MINIO_SECRET_KEY: str = "minio_secret_key"
-    MINIO_BUCKET: str = "processed-images"
+    MINIO_ACCESS_KEY: str
+    MINIO_SECRET_KEY: str
+    MINIO_BUCKET: str
 
     POSTGRES_TABLE_NAME: str = "detections"
+    POSTGRES_HOST: str
+    POSTGRES_DB: str
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
     POSTGRES_DSN: str = ""
 
-    REDIS_HOST: str = "redis"
-    REDIS_PORT: str = 6379
-    REDIS_DB: str = 0
-
-    REDIS_QUEUE_KEY: str = "image_queue"
+    REDIS_HOST: str
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_QUEUE_KEY: str
 
     class Config:
-        env_file = ".env"
+        env_file = [".env", ".env.private"]
         env_file_encoding = "utf-8"
 
 settings = Settings()

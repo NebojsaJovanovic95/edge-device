@@ -1,7 +1,7 @@
 import asyncio, tempfile, os, logging, pickle
 from ultralytics import YOLO
 
-from src.db_util import DbUtil
+from src.db_util import db
 from src.image_storage import ImageStorage
 from src.config import settings
 
@@ -22,7 +22,6 @@ logging.basicConfig(
 logger = logging.getLogger("stream_processor")
 
 model = YOLO(settings.MODEL_PATH)
-db = DbUtil(settings.DB_PATH)
 
 local_storage: ImageStorage = ImageStorage(
     base_dir=settings.IMAGE_DIR,
@@ -51,7 +50,7 @@ async def process_queue():
     """Continuously process images from Redis queue."""
     logger.info(f"[{NAME}] Starting Redis YOLO worker...")
     while True:
-        data = await redis_cleint.blpop(
+        data = await redis_client.blpop(
             settings.REDIS_QUEUE_KEY,
             timeout=5
         )
