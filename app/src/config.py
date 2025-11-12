@@ -1,5 +1,6 @@
 import os
 from pydantic_settings import BaseSettings
+from functools import cached_property
 
 class Settings(BaseSettings):
     BASE_DIR: str = "/app"
@@ -13,8 +14,8 @@ class Settings(BaseSettings):
 
     USE_MINIO: bool = True
     MINIO_ENDPOINT: str = "http://minio:9000"
-    MINIO_ACCESS_KEY: str
-    MINIO_SECRET_KEY: str
+    MINIO_ROOT_USER: str
+    MINIO_ROOT_PASSWORD: str
     MINIO_BUCKET: str
 
     POSTGRES_TABLE_NAME: str = "detections"
@@ -22,11 +23,13 @@ class Settings(BaseSettings):
     POSTGRES_DB: str
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
-    POSTGRES_DSN: str = ""
+    @cached_property
+    def POSTGRES_DSN(self) -> str:
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}/{self.POSTGRES_DB}"
 
     REDIS_HOST: str
-    REDIS_PORT: int = 6379
-    REDIS_DB: int = 0
+    REDIS_PORT: int
+    REDIS_DB: int
     REDIS_QUEUE_KEY: str
 
     class Config:

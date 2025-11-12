@@ -17,10 +17,10 @@ services:
       - yolov8_net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    test: ["CMD-SHELL", "nc -z localhost 9000 || exit 1"]
+    interval: 10s
+    timeout: 5s
+    retries: 20
 
   postgres:
     image: docker.io/postgres:latest
@@ -50,11 +50,17 @@ services:
     networks:
       - yolov8_net
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   yolov8_server:
     build:
       context: ./app
       dockerfile: Dockerfile
+    image: yolov8_server:latest
     container_name: yolov8_server
     env_file:
       - .env
@@ -67,12 +73,9 @@ services:
     networks:
       - yolov8_net
     depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      redis:
-        condition: service_started
+      - postgres
+      - minio
+      - redis
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
@@ -84,6 +87,7 @@ services:
     build:
       context: ./streaming_app
       dockerfile: Dockerfile
+    image: streaming_app:latest
     container_name: streaming_app
     env_file:
       - .env

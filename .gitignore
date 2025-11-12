@@ -1,2 +1,4 @@
 *.jpg
 *.log
+data/
+postgres_data/

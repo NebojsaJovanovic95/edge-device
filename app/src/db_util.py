@@ -223,16 +223,39 @@ class SqliteDb(BaseDb):
 
 class PostgresDb(BaseDb):
     """POstgres main DB."""
+    SQL_CREATE_TABLE = """
+    CREATE TABLE IF NOT EXISTS {table} (
+        {id_col} SERIAL PRIMARY KEY,
+        {image_col} TEXT NOT NULL,
+        {data_col} JSONB NOT NULL,
+        {ts_col} BIGINT NOT NULL
+    )
+    """
 
     def __init__(self, conn_str: str, table_name: str):
         self.conn_str = conn_str
         self.table = table_name
+        self._init_table()
 
     def _get_conn(self):
         return psycopg2.connect(
             self.conn_str,
             cursor_factory=RealDictCursor
         )
+    
+    def _init_table(self):
+        # Format the stored SQL template with the actual table/column names
+        query = self.SQL_CREATE_TABLE.format(
+            table=self.table,
+            id_col=self.COL_ID,
+            image_col=self.COL_IMAGE_PATH,
+            data_col=self.COL_DETECTION_DATA,
+            ts_col=self.COL_CREATED_AT
+        )
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query)
+                conn.commit()
 
     def insert_detection(
         self,

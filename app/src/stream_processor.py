@@ -2,7 +2,7 @@ import asyncio, tempfile, os, logging, pickle
 from ultralytics import YOLO
 
 from src.db_util import db
-from src.image_storage import ImageStorage
+from src.image_storage import local_storage, minio_storage
 from src.config import settings
 
 from src.redis_client import redis_client
@@ -22,20 +22,6 @@ logging.basicConfig(
 logger = logging.getLogger("stream_processor")
 
 model = YOLO(settings.MODEL_PATH)
-
-local_storage: ImageStorage = ImageStorage(
-    base_dir=settings.IMAGE_DIR,
-    use_minio=False
-)
-
-minio_storage: ImageStorage = ImageStorage(
-    base_dir=settings.IMAGE_DIR,
-    use_minio=settings.USE_MINIO,
-    minio_endpoint=settings.MINIO_ENDPOINT,
-    minio_access_key=settings.MINIO_ACCESS_KEY,
-    minio_secret_key=settings.MINIO_SECRET_KEY,
-    minio_bucket=settings.MINIO_BUCKET
-)
 
 async def enqueue_image(image_bytes: bytes, filename: str):
     """Adds an image to redis queue as aserialized tuple."""
@@ -61,31 +47,33 @@ async def process_queue():
         _, serialized = data
         try:
             image_bytes, filename = pickle.loads(serialized)
+            tmp_path = None
 
             with tempfile.NamedTemporaryFile(
                 delete=False,
                 suffix=".jpg"
             ) as tmp:
                 tmp.write(image_bytes)
-                tmp.seek(0)
-                local_path = local_storage.save_image(
-                    tmp,
-                    filename=filename
-                )
+                tmp.flush()
+                tmp_path = tmp.name
 
-            results = model(str(local_path))
+            results = await asyncio.to_thread(
+                model,
+                tmp_path
+            )
+
             detection_data = results[0].to_json()
 
             with open(local_path, "rb") as f:
                 minio_path = minio_storage.save_image(f, filename)
 
             db.insert_detection(
-                str(minio_path),
-                detection_data
+                image_path=str(minio_path),
+                detection_data=detection_data
             )
             logger.info(f"[{NAME}] Processed and uploaded {filename}")
 
             os.remove(local_path)
         
         except Exception as e:
-            logger.info(f"[{NAME}] Error processing {filename}: {e}")
+            logger.exception(f"[{NAME}] Error processing {filename}: {e}")
