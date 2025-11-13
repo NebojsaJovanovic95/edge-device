@@ -1,6 +1,7 @@
 import os
 from pydantic_settings import BaseSettings
 from functools import cached_property
+from pathlib import Path
 
 class Settings(BaseSettings):
     BASE_DIR: str = "/app"
@@ -33,7 +34,11 @@ class Settings(BaseSettings):
     REDIS_QUEUE_KEY: str
 
     class Config:
-        env_file = [".env", ".env.private"]
+        project_root = Path(__file__).resolve().parents[2]
+        env_file = [
+            project_root / ".env",
+            project_root / ".env.private",
+        ]
         env_file_encoding = "utf-8"
 
 settings = Settings()

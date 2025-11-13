@@ -4,12 +4,11 @@ import json
 import time
 import sqlite3
 import threading
-import logging
+from src.util import logger
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from src.config import settings
-
-logger = logging.getLogger(__name__)
+from psycopg2 import OperationalError
 
 class BaseDb:
     """Base class storing common SQL strings and helper logic."""
@@ -435,7 +434,22 @@ class DetectionDb:
         )
         t.start()
 
-db: DetectionDb = DetectionDb(
-    postgres_dsn=settings.POSTGRES_DSN,
-    sqlite_path=settings.CACHE_DB_PATH
-)
+
+def init_db_with_retry(
+    max_retires: int = 10,
+    delay: int = 3
+) -> DetectionDb:
+    for attempt in range(max_retires):
+        try:
+            return DetectionDb(
+                postgres_dsn=settings.POSTGRES_DSN,
+                sqlite_path=settings.CACHE_DB_PATH
+            )
+        except OperationalError as e:
+            logger.exception(
+                f"Postgres not ready {attempt}: {e}"
+            )
+            time.sleep(delay)
+    raise RuntimeError("Failed to connect to Postgres after retries")
+
+db: DetectionDb = init_db_with_retry()
