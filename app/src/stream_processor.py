@@ -44,6 +44,7 @@ async def process_queue():
             await asyncio.sleep(0.1)
             continue
 
+        logger.info(f"[{NAME}] Got item from Redis Queue...")
         _, serialized = data
         try:
             image_bytes, filename = pickle.loads(serialized)
