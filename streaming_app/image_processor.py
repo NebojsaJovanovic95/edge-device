@@ -1,4 +1,4 @@
-import os
+import os, time
 import requests
 import logging
 
@@ -32,4 +32,6 @@ def process_images():
             send_image_to_yolo(image_path=image_path)
 
 if __name__ == '__main__':
-    process_images()
+    while True:
+        process_images()
+        time.sleep(5)
