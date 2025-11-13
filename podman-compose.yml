@@ -25,9 +25,10 @@ services:
   postgres:
     image: docker.io/postgres:latest
     container_name: postgres
-    env_file:
-      - .env
-      - .env.private
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: supersecret
+      POSTGRES_DB: mydb
     volumes:
       - ./postgres_data:/var/lib/postgresql:Z
     ports:
@@ -61,6 +62,7 @@ services:
       dockerfile: Dockerfile
     image: yolov8_server:latest
     container_name: yolov8_server
+    user: "1000:1000"
     env_file:
       - .env
       - .env.private
@@ -92,7 +94,7 @@ services:
       - .env
       - .env.private
     volumes:
-      - ./logs:/app/logs:Z
+      - ./logs/streaming_app:/app/logs:Z
       - ./images:/app/images:Z
     networks:
       - yolov8_net
