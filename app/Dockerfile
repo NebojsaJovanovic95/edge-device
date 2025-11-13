@@ -26,8 +26,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 COPY . /app
 
-RUN mkdir -p /models /app/images /app/logs /app/cache \
-    && chmod -R 777 /app/images /app/logs /app/cache
+RUN mkdir -p /models /app/images /app/logs /app/cache /app/.config/matplotlib /app/.config/Ultralytics \
+    && chmod -R 777 /app/images /app/logs /app/cache /app/.config
 
 # Pre-download YOLOv8 model to /models
 RUN python -c "from ultralytics import YOLO; model = YOLO('yolov8n.pt'); \

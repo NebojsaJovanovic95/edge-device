@@ -1,4 +1,5 @@
 # Edge Device Object Detection
+Yolov8 model inference on an edge device
 
 # Project Architecture
 

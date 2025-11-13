@@ -66,6 +66,9 @@ services:
     env_file:
       - .env
       - .env.private
+    environment:
+      MPLCONFIGDIR: /tmp/matplotlib
+      YOLO_CONFIG_DIR: /tmp/ultralytics
     volumes:
       - ./logs:/app/logs:Z
       - ./models:/app/models:Z
