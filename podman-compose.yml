@@ -17,30 +17,30 @@ services:
       - yolov8_net
     restart: unless-stopped
     healthcheck:
-    test: ["CMD-SHELL", "nc -z localhost 9000 || exit 1"]
-    interval: 10s
-    timeout: 5s
-    retries: 20
+      test: ["CMD-SHELL", "mc alias set local http://127.0.0.1:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD && mc admin info local || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
 
   postgres:
     image: docker.io/postgres:latest
     container_name: postgres
-    env_file:
-      - .env
-      - .env.private
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: supersecret
+      POSTGRES_DB: mydb
     volumes:
       - ./postgres_data:/var/lib/postgresql:Z
-      - ./db_init:/docker-entrypoint-initdb.d:Z
     ports:
       - "5432:5432"
     networks:
       - yolov8_net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U myuser -d mydb"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 30
 
   redis:
     image: docker.io/redis:7
@@ -62,9 +62,13 @@ services:
       dockerfile: Dockerfile
     image: yolov8_server:latest
     container_name: yolov8_server
+    user: "1000:1000"
     env_file:
       - .env
       - .env.private
+    environment:
+      MPLCONFIGDIR: /tmp/matplotlib
+      YOLO_CONFIG_DIR: /tmp/ultralytics
     volumes:
       - ./logs:/app/logs:Z
       - ./models:/app/models:Z
@@ -93,7 +97,7 @@ services:
       - .env
       - .env.private
     volumes:
-      - ./logs:/app/logs:Z
+      - ./logs/streaming_app:/app/logs:Z
       - ./images:/app/images:Z
     networks:
       - yolov8_net
