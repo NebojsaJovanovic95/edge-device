@@ -274,12 +274,13 @@ class PostgresDb(BaseDb):
                     query,
                     (
                         image_path,
-                        psycopg2.extras.Json(detection_data, dumps=json.dumps),
+                        psycopg2.extras.Json(detection_data),
                         ts
                     )
                 )
+                inserted_id = cur.fetchone()[0]
                 conn.commit()
-                return cur.fetchone()[0]
+                return inserted_id
 
     def get_detection_by_id(
         self,
