@@ -8,12 +8,13 @@ WORKDIR /app
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1
 
-# Install system dependencies (OpenCV runtime deps + git)
+# Install system dependencies (OpenCV runtime deps + git + ping)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     git \
     tzdata \
+    iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 
 # Set timezone (adjust if needed)

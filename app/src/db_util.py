@@ -440,6 +440,7 @@ def init_db_with_retry(
     delay: int = 3
 ) -> DetectionDb:
     for attempt in range(max_retires):
+        logger.info(f"Connecting to Postgres: {settings.POSTGRES_DSN}")
         try:
             return DetectionDb(
                 postgres_dsn=settings.POSTGRES_DSN,

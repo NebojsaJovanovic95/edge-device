@@ -8,6 +8,8 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
 
+logger = logging.getLogger("streaming_apps")
+
 image_directory = '/app/images'
 
 YOLO_API_URL = 'http://yolov8_server:5000/stream'
