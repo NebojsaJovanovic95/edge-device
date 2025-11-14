@@ -63,10 +63,6 @@ services:
       dockerfile: Dockerfile
     image: yolov8_server:latest
     container_name: yolov8_server
-    # user: "1000:1000"
-    env_file:
-      - .env
-      - .env.private
     environment:
       MPLCONFIGDIR: /tmp/matplotlib
       YOLO_CONFIG_DIR: /tmp/ultralytics

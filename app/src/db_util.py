@@ -267,6 +267,7 @@ class PostgresDb(BaseDb):
             self.SQL_INSERT,
             self.table
         )
+        logger.info(f"Query: {query} data: ({image_path}, {json.dumps(detection_data)}, {ts})")
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
