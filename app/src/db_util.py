@@ -6,7 +6,7 @@ import sqlite3
 import threading
 from src.util import logger
 import psycopg2
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import RealDictCursor, Json
 from src.config import settings
 from psycopg2 import OperationalError
 
@@ -267,14 +267,14 @@ class PostgresDb(BaseDb):
             self.SQL_INSERT,
             self.table
         )
-        logger.info(f"Query: {query} data: ({image_path}, {json.dumps(detection_data)}, {ts})")
+        logger.info(f"Query: {query} \ndata: ({image_path}, detection type: ({type(detection_data)}) \ndata: {psycopg2.extras.Json(detection_data)}, {ts})")
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     query,
                     (
                         image_path,
-                        json.dumps(detection_data),
+                        psycopg2.extras.Json(detection_data, dumps=json.dumps),
                         ts
                     )
                 )
@@ -348,7 +348,7 @@ class DetectionDb:
         detection_data: dict[str, Any]
     ) -> int:
         """Insert into both cache and main DB."""
-        ts: int = int(time.time())
+        ts: datetime = int(time.time())
         local_id = self.cache.insert_detection(
             image_path,
             detection_data,

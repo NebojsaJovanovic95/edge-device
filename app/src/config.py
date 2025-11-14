@@ -1,9 +1,8 @@
 import os
-from pydantic_settings import BaseSettings
 from functools import cached_property
 from pathlib import Path
 
-class Settings(BaseSettings):
+class Settings:
     BASE_DIR: str = "/app"
 
     MODEL_PATH: str = os.path.join(BASE_DIR, "models", "yolov8n.pt")
@@ -27,10 +26,10 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = "supersecret"
     POSTGRES_DSN: str = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 
-    REDIS_HOST: str
-    REDIS_PORT: int
-    REDIS_DB: int
-    REDIS_QUEUE_KEY: str
+    REDIS_HOST: str = "redis"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_QUEUE_KEY: str = "image_queue"
 
     # class Config:
     #     env_file = [".env", ".env.private"]

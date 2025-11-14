@@ -1,4 +1,4 @@
-import asyncio, tempfile, os, logging, pickle
+import asyncio, tempfile, os, logging, pickle, json
 from ultralytics import YOLO
 
 from src.db_util import db
@@ -63,7 +63,7 @@ async def process_queue():
                 tmp_path
             )
 
-            detection_data = results[0].to_json()
+            detection_data = json.loads(results[0].to_json())
 
             with open(tmp_path, "rb") as f:
                 minio_path = minio_storage.save_image(f, filename)
