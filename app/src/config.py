@@ -21,10 +21,11 @@ class Settings(BaseSettings):
 
     POSTGRES_TABLE_NAME: str = "detections"
     POSTGRES_HOST: str = "postgres"
+    POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "mydb"
     POSTGRES_USER: str = "myuser"
     POSTGRES_PASSWORD: str = "supersecret"
-    POSTGRES_DSN: str = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}/{POSTGRES_DB}"
+    POSTGRES_DSN: str = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 
     REDIS_HOST: str
     REDIS_PORT: int

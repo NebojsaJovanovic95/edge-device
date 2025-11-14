@@ -1,6 +1,7 @@
 import os, time
-import requests
 import logging
+import aiohttp
+import asyncio
 
 logging.basicConfig(
     filename="/app/logs/streaming_app.log",
@@ -14,29 +15,41 @@ image_directory = '/app/images'
 
 YOLO_API_URL = 'http://yolov8_server:5000/stream'
 
-def send_image_to_yolo(image_path):
+async def send_image_to_yolo(session, image_path):
     logger.info(f"Sending image: {image_path}")
     try:
         with open(image_path, 'rb') as img_file:
-            response = requests.post(
+            data = {'file': img_file}
+            async with session.post(
                 YOLO_API_URL,
-                files={"file": img_file}
-            )
-            if response.status_code == 200:
-                logger.info(f"Successfully processed {image_path}")
-            else:
-                logger.error(f"Failed to process {image_path}, Status Code: {response.status_code}")
+                data=data
+            ) as response:
+                if response.status == 200:
+                    logger.info(f"Successfully processed {image_path}")
+                else:
+                    logger.error(f"Failed to process {image_path}, Status Code: {response.status}")
     except Exception as e:
         logger.error(f"Error processing {image_path}: {str(e)}")
 
-def process_images():
-    for filename in os.listdir(image_directory):
-        if filename.endswith('jpg') or filename.endswith('png'):
-            image_path = os.path.join(image_directory, filename)
-            send_image_to_yolo(image_path=image_path)
+async def process_images():
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for filename in os.listdir(image_directory):
+            if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+                image_path = os.path.join(image_directory, filename)
+                tasks.append(
+                    send_image_to_yolo(
+                        session=session,
+                        image_path=image_path
+                    )
+                )
+        await asyncio.gather(*tasks)
 
-if __name__ == '__main__':
+async def main():
     logger.info(f"{__name__} i am up...")
     while True:
-        process_images()
-        time.sleep(5)
+        await process_images()
+        await asyncio.sleep(5)
+
+if __name__ == '__main__':
+    asyncio.run(main())

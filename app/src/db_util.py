@@ -436,20 +436,20 @@ class DetectionDb:
 
 
 def init_db_with_retry(
-    max_retires: int = 10,
+    max_retries: int = 10,
     delay: int = 3
 ) -> DetectionDb:
-    for attempt in range(max_retires):
-        logger.info(f"Connecting to Postgres: {settings.POSTGRES_DSN}")
+    for attempt in range(max_retries):
+        logger.info(f"Connecting to Postgres: {settings.POSTGRES_DSN} (attempt {attempt + 1})")
         try:
-            return DetectionDb(
+            db_instance = DetectionDb(
                 postgres_dsn=settings.POSTGRES_DSN,
                 sqlite_path=settings.CACHE_DB_PATH
             )
+            logger.info("Successfully connected to Postgres!")
+            return db_instance
         except OperationalError as e:
-            logger.exception(
-                f"Postgres not ready {attempt}: {e}"
-            )
+            logger.warning(f"Postgres not ready (attempt {attempt + 1}): {e}")
             time.sleep(delay)
     raise RuntimeError("Failed to connect to Postgres after retries")
 
