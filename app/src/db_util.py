@@ -368,7 +368,7 @@ class DetectionDb:
             return pg_id
         except Exception as e:
             logger.warning(
-                f"Postgres insert failed: {e}, keeping local cache ID {local_id}"
+                f"Postgres insert failed: {e.format_exc()}, keeping local cache ID {local_id}"
             )
             return local_id
 
