@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     tzdata \
     iputils-ping \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Set timezone (adjust if needed)

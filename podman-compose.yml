@@ -87,6 +87,8 @@ services:
       timeout: 5s
       retries: 5
 
+
+
   streaming_app:
     build:
       context: ./streaming_app
@@ -105,6 +107,11 @@ services:
       - yolov8_server
       - redis
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c 'import socket; s=socket.socket(); s.settimeout(2); exit(s.connect_ex((\"yolov8_server\",5000)))'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # test_app:
   #   build:

@@ -65,7 +65,7 @@ async def process_queue():
 
             detection_data = results[0].to_json()
 
-            with open(local_path, "rb") as f:
+            with open(tmp_path, "rb") as f:
                 minio_path = minio_storage.save_image(f, filename)
 
             db.insert_detection(
@@ -74,7 +74,7 @@ async def process_queue():
             )
             logger.info(f"[{NAME}] Processed and uploaded {filename}")
 
-            os.remove(local_path)
+            os.remove(tmp_path)
         
         except Exception as e:
             logger.exception(f"[{NAME}] Error processing {filename}: {e}")
