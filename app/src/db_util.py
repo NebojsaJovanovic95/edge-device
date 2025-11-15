@@ -267,7 +267,7 @@ class PostgresDb(BaseDb):
             self.SQL_INSERT,
             self.table
         )
-        logger.info(f"Query: {query} \ndata: ({image_path}, detection type: ({type(detection_data)}) \ndata: {psycopg2.extras.Json(detection_data)}, {ts})")
+        logger.info(f"Query: {query} \ndata: ({image_path}, detection type: ({type(detection_data)}), {ts})")
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -278,7 +278,7 @@ class PostgresDb(BaseDb):
                         ts
                     )
                 )
-                inserted_id = cur.fetchone()[0]
+                inserted_id = cur.fetchone()[self.COL_ID]
                 conn.commit()
                 return inserted_id
 
@@ -368,7 +368,7 @@ class DetectionDb:
             return pg_id
         except Exception as e:
             logger.warning(
-                f"Postgres insert failed: {e.format_exc()}, keeping local cache ID {local_id}"
+                f"Postgres insert failed: {e}, keeping local cache ID {local_id}"
             )
             return local_id
 
