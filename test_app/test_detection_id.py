@@ -14,7 +14,7 @@ def run_test(id: int = TEST_ID):
 
     # 1️⃣ Parse detection metadata from header
     detection_header = response.headers.get("X-Detection-Data", "[]")
-    detections = json.loads(json.loads(detection_header))
+    detections = json.loads(detection_header)
     print(f"detections {type(detections)} after json loads {detections}")
 
     # 2️⃣ Save streamed image temporarily to disk
