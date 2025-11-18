@@ -4,7 +4,7 @@ from typing import BinaryIO
 import shutil
 import os
 import boto3
-from botocore.exceptions import NoCredentialsError
+from botocore.exceptions import NoCredentialsError, ClientError
 from io import BytesIO
 from src.util import logger
 from src.config import settings
@@ -36,9 +36,22 @@ class ImageStorage:
                 region_name='us-east-1'
             )
             self.bucket_name = minio_bucket
+            self._ensure_bucket_exists()
         else:
             self.base_dir.mkdir(parents=True, exist_ok=True)
     
+    def _ensure_bucket_exists(self) -> None:
+        """Create the bucket if it doesnt exist"""
+        try:
+            self.s3_client.head_bucket(Bucket=self.bucket_name)
+            logger.info(F"[{self.NAME}]: Bucket '{self.bucket_name}' exists")
+        except ClientError as e:
+            if e.response["Error"]["Code"] in ('404', 'NoSuchBucket'):
+                self.s3_client.create_bucket(Bucket=self.bucket_name)
+                logger.info(f"[{self.NAME}]: Created bucket '{self.bucket_name}'")
+            else:
+                logger.error(f"[{self.NAME}]: Error checking buckets: {e}")
+
     def save_image(
         self,
         file_obj: BinaryIO,
@@ -53,7 +66,7 @@ class ImageStorage:
                     self.bucket_name,
                     filename
                 )
-                logger.infor(f"[{self.NAME}]: Uploaded {filename} to MinIO bucket {self.bucket_name}")
+                logger.info(f"[{self.NAME}]: Uploaded {filename} to MinIO bucket {self.bucket_name}")
             except NoCredentialError:
                 logger.error(f"[{self.NAME}]: Credentials not available for MinIO")
             except Exception as e:
@@ -62,9 +75,10 @@ class ImageStorage:
                 return filename
         else:
             save_path: Path = self.base_dir / filename
+            save_path.parent.mkdir(parents=True, exist_ok=True)
             with open(save_path, "wb") as out_file:
                 shutil.copyfileobj(file_obj, out_file)
-            return save_path
+            return str(save_path.relative_to(self.base_dir))
     
     def load_image(self, image_path: str) -> BinaryIO:
         """Load an image file from disk for streaming."""
@@ -82,7 +96,7 @@ class ImageStorage:
                 logger.error(f"[{self.NAME}]: Error laoding image from MinIO: {e}")
                 return BytesIO()
         else:
-            path = Path(image_path)
+            path = self.base_dir / image_path
             if not path.exists():
                 logger.error(
                     f"[{self.NAME}]: Image not found: {image_path}"

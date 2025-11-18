@@ -11,6 +11,7 @@ from src.db_util import db
 from src.image_storage import minio_storage
 from src.util import DetectionResponse
 from src.stream_processor import enqueue_image, process_queue
+from src.util import logger
 
 from src.redis_client import redis_client
 
@@ -18,6 +19,8 @@ app = FastAPI(title="YOLOv8 Edge API")
 
 # Initialize singletons using config paths
 model: YOLO = YOLO(settings.MODEL_PATH)
+
+NAME: str = "yolov8_server"
 
 @app.on_event("startup")
 async def startup_event():
@@ -52,6 +55,7 @@ async def detect(
             tmp,
             filename = file.filename
         )
+        logger.info(f"[{NAME}]: Saved image with path '{image_path}'.")
         results = model(tmp.name)
     
     detection_data: json = results[0].tojson()
@@ -60,6 +64,8 @@ async def detect(
         str(image_path),
         json.loads(detection_data)
     )
+
+    logger.info(f"[{NAME}]: Saved detection {detection_id}.")
 
     return JSONResponse(
         {
@@ -85,7 +91,7 @@ async def get_detection(id: int):
             status_code=404,
             detail="Detection not found"
         )
-    print(f"Fetched detection: s{detection}")
+    logger.info(f"[{NAME}]: Fetched detection: s{detection}")
     
     image_path: str = detection["image_path"]
     detection_data: list[dict[str, Any]] = json.loads(detection["detection_data"])

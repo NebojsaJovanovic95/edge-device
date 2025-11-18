@@ -1,10 +1,10 @@
 # Build
 ## yolov8_server
-podman build -t yolov8_server -f Dockerfile app/.
+podman build --no-cache -t yolov8_server -f Dockerfile app/.
 ## test_app
 podman build -t test_app:latest ./test_app
 ## image_stream
-podman build -t image_stream -f Dockerfile streaming_app/.
+podman build -t streaming_app -f Dockerfile streaming_app/.
 # Run
 ## podman network
 podman network create yolov8_net
@@ -54,7 +54,7 @@ podman run -d --replace\
   --env-file .env.private \
   -v ./logs:/app/logs:Z \
   test_app:latest
-## image_stream
+## streaming_app
 podman run -d --replace\
   --name streaming_app \
   --network yolov8_net \
