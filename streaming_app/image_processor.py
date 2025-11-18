@@ -1,7 +1,9 @@
-import os, time
+import os, time, cv2
 import logging
 import aiohttp
 import asyncio
+import numpy as np
+from bytes import BytesIO
 
 logging.basicConfig(
     filename="/app/logs/streaming_app.log",
@@ -14,6 +16,14 @@ logger = logging.getLogger("streaming_apps")
 image_directory = '/app/images'
 
 YOLO_API_URL = 'http://yolov8_server:5000/stream'
+VIDEO_PATH = "/app/videos/input_video.mp4"
+FRAME_INTERVAL = 5
+HASH_DIFF_THRESHOLD = 1000
+
+def frame_hash(frame: np.ndarray) -> int:
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR@GRAY)
+    resized = cv2.resize(gray, (64,64))
+    return int(hashlib.md5(resized).hexdigest(), 16)
 
 async def send_image_to_yolo(session, image_path):
     logger.info(f"Sending image: {image_path}")
@@ -31,7 +41,7 @@ async def send_image_to_yolo(session, image_path):
     except Exception as e:
         logger.error(f"Error processing {image_path}: {str(e)}")
 
-async def process_images():
+async def process_images(image_bytes: bytes):
     async with aiohttp.ClientSession() as session:
         tasks = []
         for filename in os.listdir(image_directory):
@@ -45,10 +55,35 @@ async def process_images():
                 )
         await asyncio.gather(*tasks)
 
+
+async def process_video():
+    prev_hash = None
+    cap = cv2.VideoCapture(VIDEO_PATH)
+    frame_count = 0
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            logger.infor(f"[{__name__}]: End of video or failed to read fram.")
+            break
+        
+        frame_count += 1
+        if frame_count % FRAME_INTERVAL != 0:
+            continue
+        
+        current_hash = frame_hash(frame)
+        if (prev_hash is None
+            or abs(current_hash - prev_hash) > HASH_DIFF_THRESHOLD):
+            prev_hash = current_hash
+            await send_frame_to_yolo(
+                session,
+                frame
+            )
+
 async def main():
     logger.info(f"{__name__} i am up...")
     while True:
-        await process_images()
+        await process_video()
         await asyncio.sleep(5)
 
 if __name__ == '__main__':

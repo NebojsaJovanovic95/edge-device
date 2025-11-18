@@ -1,3 +1,5 @@
 requests
 Pillow
 aiohttp
+numpy
+bytes
