@@ -13,6 +13,8 @@ class ImageStorage:
     """
     Handles saving, loading, and deleting image files.
     """
+    NAME = "IMAGE_STORAGE"
+
     def __init__(
         self,
         base_dir: str,
