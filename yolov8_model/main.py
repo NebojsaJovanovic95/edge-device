@@ -10,12 +10,27 @@ from shared_config.settings import (
     REDIS_MODEL_RESULT_QUEUE,
     MODEL_PATH
 )
+import logging
 
+LOG_PATH = "/app/logs/yolov8_model.log"
+os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+
+logging.basicConfig(
+    filename=LOG_PATH,
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_PATH),
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger("yolov8_model")
 model = YOLO(MODEL_PATH)
 NAME = "YOLOv8_MODEL"
 
 async def process_model_queue():
-    print(f"[{NAME}] Worker started, listening for model requests...")
+    logger.info(f"[{NAME}] Worker started, listening for model requests...")
     while True:
         item = await redis_client.blpop(REDIS_MODEL_REQUEST_QUEUE, timeout=5)
         if not item:
@@ -44,11 +59,13 @@ async def process_model_queue():
             })
             await redis_client.rpush(REDIS_MODEL_RESULT_QUEUE, result_payload)
 
-            print(f"[{NAME}] Processed {filename}, results pushed to results queue")
+            logger.info(
+                f"[{NAME}] Processed {filename}, results pushed to results queue"
+            )
             os.remove(tmp_path)
 
         except Exception as e:
-            print(f"[{NAME}] Error processing request: {e}")
+            logger.error(f"[{NAME}] Error processing request: {e}")
 
 async def main():
     await process_model_queue()
