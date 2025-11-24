@@ -30,6 +30,11 @@ class Settings:
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
     REDIS_QUEUE_KEY: str = "image_queue"
+    
+    REDIS_TASK_QUEUE: str = "task_queue"
+    REDIS_MODEL_REQUEST_QUEUE: str = "model_request_queue"
+    REDIS_MODEL_RESULT_QUEUE: str = "model_result_queue"
+    REDIS_STORAGE_QUEUE: str = "storage_queue"
 
     # class Config:
     #     env_file = [".env", ".env.private"]
