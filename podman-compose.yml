@@ -21,7 +21,7 @@ services:
       - yolov8_net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "mc alias set local http://127.0.0.1:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD && mc admin info local || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://minio:9000/minio/health/live || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 20
