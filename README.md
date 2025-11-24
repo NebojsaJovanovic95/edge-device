@@ -102,3 +102,53 @@ flowchart TB
 
 13 directories, 34 files
 ```
+
+# Future Architecture
+```mermaid
+flowchart TB
+    subgraph Streaming_Apps[streaming app replicas]
+        cameras["one instance per camera"]
+    end
+
+    subgraph Redis
+        direction TB
+        STREAM[streaming requests]
+        MODEL_REQUESTS[model requests]
+        MODEL_RESULTS[model results]
+        STORAGE_BUFFER[storage buffering]
+    end
+
+    subgraph YOLOv8_Server["Yolov8 Server (replicas)"]
+        FAST_API["request routing instance"]
+        %% DetectionDB bellow FAST_API
+        direction TB
+        subgraph DetectionDB
+            CACHE[sqllite for caching]
+            PG_CLIENT[postgres connection]
+        end
+    end
+
+    subgraph YOLOv8_MODEL
+        GPU[yolo model runs on gpu with cuda]
+    end
+
+
+    subgraph Postgres
+        PG[postgres]
+    end
+
+    subgraph MinIO [Minio Object Storage]
+        M[minio]
+    end
+
+    Streaming_Apps --> STREAM
+    STREAM --> FAST_API
+    FAST_API <--> MODEL_REQUESTS
+    FAST_API <--> DetectionDB
+    MODEL_REQUESTS --> GPU
+    GPU --> MODEL_RESULTS
+    MODEL_RESULTS --> FAST_API
+    DetectionDB <--> STORAGE_BUFFER
+    STORAGE_BUFFER <--> PG
+    STORAGE_BUFFER <--> M
+```
