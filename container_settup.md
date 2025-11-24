@@ -66,3 +66,6 @@ podman run -d --replace\
 # logs
 podman logs yolov8_server
 podman logs yolov8_client
+
+# Disable pods to work on podman-compose
+export PODMAN_COMPOSE_FORCE_PODMAN_POD=0
