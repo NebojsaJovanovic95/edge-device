@@ -96,6 +96,7 @@ services:
     volumes:
       - ./logs/yolov8_model:/app/logs:Z
       - ./shared_config:/app/shared_config:ro
+      - ./models:/app/model
     networks:
       - yolov8_net
     depends_on:

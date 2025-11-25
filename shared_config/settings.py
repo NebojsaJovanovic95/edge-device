@@ -18,3 +18,5 @@ MINIO_ENDPOINT = "http://minio:9000"
 MINIO_ROOT_USER = "minio_access_key"
 MINIO_ROOT_PASSWORD = "minio_secret_key"
 MINIO_BUCKET = "processed-images"
+
+LOG_DIR = "/app/logs"

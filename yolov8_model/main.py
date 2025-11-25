@@ -8,24 +8,23 @@ from shared_config.redis_client import redis_client
 from shared_config.settings import (
     REDIS_MODEL_REQUEST_QUEUE,
     REDIS_MODEL_RESULT_QUEUE,
-    MODEL_PATH
+    LOG_DIR
 )
+import sys
 import logging
-
-LOG_PATH = "/app/logs/yolov8_model.log"
-os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
-
+os.makedirs(LOG_DIR, exist_ok=True)
+log_path = os.path.join(LOG_DIR, "yolov8_model.log")
 logging.basicConfig(
-    filename=LOG_PATH,
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler(LOG_PATH),
+        logging.FileHandler(log_path),
         logging.StreamHandler()
     ]
 )
-
 logger = logging.getLogger("yolov8_model")
+
+MODEL_PATH = "/app/model/yolov8n.pt"
 model = YOLO(MODEL_PATH)
 NAME = "YOLOv8_MODEL"
 

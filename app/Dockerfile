@@ -18,7 +18,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 COPY . /app
 
-RUN mkdir -p /app/logs && chmod -R 777 /app/logs
+RUN mkdir -p /app/images /app/logs /app/cache /app/.config/matplotlib /app/.config/Ultralytics \
+    && chmod -R 777 /app/images /app/logs /app/cache /app/.config
 
 EXPOSE 5000
 
