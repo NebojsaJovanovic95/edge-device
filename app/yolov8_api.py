@@ -1,7 +1,6 @@
 from __future__ import annotations
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
-from ultralytics import YOLO
 
 import uvicorn, asyncio, tempfile, os, json
 from typing import Any
@@ -17,8 +16,6 @@ from src.redis_client import redis_client
 
 app = FastAPI(title="YOLOv8 Edge API")
 
-# Initialize singletons using config paths
-model: YOLO = YOLO(settings.MODEL_PATH)
 
 NAME: str = "yolov8_server"
 
@@ -56,7 +53,24 @@ async def detect(
             filename = file.filename
         )
         logger.info(f"[{NAME}]: Saved image with path '{image_path}'.")
-        results = model(tmp.name)
+        request_id = str(uuid.uuid4())
+
+        payload = pickle.dumps({
+            "request_id": request_id,
+            "filename": file.filename,
+            "image_bytes": image_bytes,
+            "minio_path": str(minio_path),
+        })
+
+        # Send job
+        await redis_client.rpush(settings.REDIS_MODEL_REQUEST_QUEUE, payload)
+
+        # Listen for result
+        result_key = f"{settings.REDIS_MODEL_RESULT_QUEUE_PREFIX}{request_id}"
+        _, result_raw = await redis_client.blpop(result_key)
+        result = pickle.loads(result_raw)
+        detection_data = result["detection"]
+
     
     detection_data: json = results[0].tojson()
 

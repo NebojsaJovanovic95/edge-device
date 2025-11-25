@@ -1,5 +1,4 @@
 import asyncio, tempfile, os, logging, pickle, json
-from ultralytics import YOLO
 
 from src.db_util import db
 from src.image_storage import local_storage, minio_storage
@@ -20,8 +19,6 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger("stream_processor")
-
-model = YOLO(settings.MODEL_PATH)
 
 async def enqueue_image(image_bytes: bytes, filename: str):
     """Adds an image to redis queue as aserialized tuple."""
@@ -58,12 +55,27 @@ async def process_queue():
                 tmp.flush()
                 tmp_path = tmp.name
 
-            results = await asyncio.to_thread(
-                model,
-                tmp_path
+            request_id = str(uuid.uuid4())
+
+            # -------- SEND JOB TO INFERENCE WORKER --------
+            payload = pickle.dumps({
+                "request_id": request_id,
+                "filename": filename,
+                "image_bytes": image_bytes,
+            })
+
+            await redis_client.rpush(
+                settings.REDIS_MODEL_REQUEST_QUEUE,
+                payload
             )
 
-            detection_data = json.loads(results[0].to_json())
+            # -------- WAIT FOR RESULT FROM WORKER --------
+            result_key = f"{settings.REDIS_MODEL_RESULT_QUEUE_PREFIX}{request_id}"
+            _, result_raw = await redis_client.blpop(result_key)
+            result = pickle.loads(result_raw)
+
+            detection_data = result["detection"]
+
 
             with open(tmp_path, "rb") as f:
                 minio_path = minio_storage.save_image(f, filename)
