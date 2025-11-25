@@ -71,6 +71,7 @@ services:
       YOLO_CONFIG_DIR: /tmp/ultralytics
     volumes:
       - ./logs:/app/logs:Z
+      - ./shared_config:/app/shared_config:ro
     ports:
       - "5000:5000"
     networks:
@@ -94,6 +95,7 @@ services:
     container_name: yolov8_model
     volumes:
       - ./logs/yolov8_model:/app/logs:Z
+      - ./shared_config:/app/shared_config:ro
     networks:
       - yolov8_net
     depends_on:
