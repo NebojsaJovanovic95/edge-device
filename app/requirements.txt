@@ -1,11 +1,6 @@
-ultralytics==8.3.0
 fastapi
 uvicorn
-opencv-python-headless
-torch
-numpy
 pillow
-pandas==2.2.2
 python-multipart
 pydantic-settings
 boto3

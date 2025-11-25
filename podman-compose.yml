@@ -71,7 +71,6 @@ services:
       YOLO_CONFIG_DIR: /tmp/ultralytics
     volumes:
       - ./logs:/app/logs:Z
-      - ./models:/app/models:Z
     ports:
       - "5000:5000"
     networks:
@@ -86,6 +85,20 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  yolov8_model:
+    build:
+      context: ./yolov8_model
+      dockerfile: Dockerfile
+    image: yolov8_model:latest
+    container_name: yolov8_model
+    volumes:
+      - ./logs/yolov8_model:/app/logs:Z
+    networks:
+      - yolov8_net
+    depends_on:
+      - redis
+    restart: unless-stopped
 
   streaming_app:
     build:

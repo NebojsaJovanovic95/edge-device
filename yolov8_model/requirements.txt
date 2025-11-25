@@ -1,0 +1,8 @@
+ultralytics==8.3.0
+opencv-python-headless
+pytorch
+numpy
+pillow
+pandas==2.2.2
+redis
+
