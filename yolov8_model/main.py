@@ -31,18 +31,26 @@ NAME = "YOLOv8_MODEL"
 async def process_model_queue():
     logger.info(f"[{NAME}] Worker started, listening for model requests...")
     while True:
-        item = await redis_client.blpop(REDIS_MODEL_REQUEST_QUEUE, timeout=5)
+        item = await redis_client.blpop(
+            REDIS_MODEL_REQUEST_QUEUE,
+            timeout=5
+        )
         if not item:
             await asyncio.sleep(0.1)
             continue
 
         _, serialized = item
         try:
-            image_bytes, metadata = pickle.loads(serialized)
-            filename = metadata.get("filename", "unknown.jpg")
+            payload = pickle.loads(serialized)
+            image_bytes = payload["image_bytes"]
+            filename = payload.get("filename", "unknown.jpg")
+            request_id = payload["request_id"]
 
             # Write image to temp file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+            with tempfile.NamedTemporaryFile(
+                delete=False,
+                suffix=".jpg"
+            ) as tmp:
                 tmp.write(image_bytes)
                 tmp.flush()
                 tmp_path = tmp.name
@@ -52,14 +60,18 @@ async def process_model_queue():
             detection_data = json.loads(results[0].tojson())
 
             # Send results back to results queue
+            result_key = f"{REDIS_MODEL_RESULT_QUEUE}:{request_id}"
             result_payload = pickle.dumps({
                 "filename": filename,
                 "detection": detection_data
             })
-            await redis_client.rpush(REDIS_MODEL_RESULT_QUEUE, result_payload)
+            await redis_client.rpush(
+                result_key,
+                result_payload
+            )
 
             logger.info(
-                f"[{NAME}] Processed {filename}, results pushed to results queue"
+                f"[{NAME}] Processed {filename}, results pushed to {result_key}"
             )
             os.remove(tmp_path)
 

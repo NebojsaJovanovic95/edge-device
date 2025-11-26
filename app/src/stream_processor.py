@@ -1,10 +1,9 @@
-import asyncio, tempfile, os, logging, pickle, json
+import asyncio, tempfile, os, logging, pickle, json, uuid
 
 from src.db_util import db
 from src.image_storage import local_storage, minio_storage
 from src.config import settings
-
-from src.redis_client import redis_client
+from shared_config.redis_client import redis_client
 
 NAME = "STREAM"
 
@@ -24,7 +23,7 @@ async def enqueue_image(image_bytes: bytes, filename: str):
     """Adds an image to redis queue as aserialized tuple."""
     data = pickle.dumps((image_bytes, filename))
     await redis_client.rpush(
-        settings.REDIS_QUEUE_KEY,
+        settings.REDIS_TASK_QUEUE,
         data
     )
     logging.info(f"[{NAME}] Queued image: {filename}") 
@@ -34,7 +33,7 @@ async def process_queue():
     logger.info(f"[{NAME}] Starting Redis YOLO worker...")
     while True:
         data = await redis_client.blpop(
-            settings.REDIS_QUEUE_KEY,
+            settings.REDIS_TASK_QUEUE,
             timeout=5
         )
         if data is None:
@@ -70,7 +69,7 @@ async def process_queue():
             )
 
             # -------- WAIT FOR RESULT FROM WORKER --------
-            result_key = f"{settings.REDIS_MODEL_RESULT_QUEUE_PREFIX}{request_id}"
+            result_key = f"{settings.REDIS_MODEL_RESULT_QUEUE}:{request_id}"
             _, result_raw = await redis_client.blpop(result_key)
             result = pickle.loads(result_raw)
 
