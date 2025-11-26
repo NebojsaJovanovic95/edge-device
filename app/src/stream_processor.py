@@ -73,6 +73,8 @@ async def process_queue():
             _, result_raw = await redis_client.blpop(result_key)
             result = pickle.loads(result_raw)
 
+            await redis_client.delete(result_key)
+
             detection_data = result["detection"]
 
 
