@@ -11,7 +11,7 @@ class Settings:
     IMAGE_DIR: str = os.path.join(BASE_DIR, "images")
     LOG_DIR: str = shared_settings.LOG_DIR
 
-    YOLO_CONFIDENCE_THRESHOLD: float = 0.25
+    MAX_SERVERS: int = 20
 
     USE_MINIO: bool = True
     MINIO_ENDPOINT: str = shared_settings.MINIO_ENDPOINT

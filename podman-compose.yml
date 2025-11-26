@@ -65,15 +65,12 @@ services:
       context: ./app
       dockerfile: Dockerfile
     image: yolov8_server:latest
-    container_name: yolov8_server
     environment:
       MPLCONFIGDIR: /tmp/matplotlib
       YOLO_CONFIG_DIR: /tmp/ultralytics
     volumes:
       - ./logs:/app/logs:Z
       - ./shared_config:/app/shared_config:ro
-    ports:
-      - "5000:5000"
     networks:
       - yolov8_net
     depends_on:
