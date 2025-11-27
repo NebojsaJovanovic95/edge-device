@@ -1,7 +1,5 @@
 version: "4.9"
 
-x-podman:
-  in_pod: true
 
 services:
   minio:
