@@ -16,10 +16,15 @@ logger = logging.getLogger("streaming_apps")
 
 image_directory = '/app/images'
 
-YOLO_API_URL = 'http://yolov8_server:5000/stream'
-VIDEO_PATH = "/app/input_video.mp4"
-FRAME_INTERVAL = 5
+YOLO_API_URL: str = 'http://yolov8_server:5000/stream'
+VIDEO_PATH: str = "/app/input_video.mp4"
+CAMERA_SOURCE: str = os.getenv(
+    "CAMERA_SOURCE",
+    VIDEO_PATH
+)
+FRAME_INTERVAL: int = int(os.getenv("FRAME_INTERVAL", 5))
 HASH_DIFF_THRESHOLD = 1000
+SEND_INTERVAL = 1.0
 
 def frame_hash(frame: np.ndarray) -> int:
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -80,18 +85,20 @@ async def process_images(image_bytes: bytes):
 
 async def process_video(session):
     prev_hash = None
-    cap = cv2.VideoCapture(VIDEO_PATH)
-    frame_count = 0
+    cap = cv2.VideoCapture(CAMERA_SOURCE)
+    prev_time = time.time()
 
     while True:
         ret, frame = cap.read()
         if not ret:
-            logger.info(f"[{__name__}]: End of video or failed to read fram.")
-            break
-        
-        frame_count += 1
-        if frame_count % FRAME_INTERVAL != 0:
+            logger.info(f"[{__name__}]: Failed to read frame.")
             continue
+        
+        current_time = time.time()
+        if current_time - prev_time < SEND_INTERVAL:
+            continue
+
+        prev_time = current_time
         
         current_hash = frame_hash(frame)
         if (prev_hash is None
