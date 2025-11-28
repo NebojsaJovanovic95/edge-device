@@ -113,12 +113,12 @@ services:
     networks:
       - yolov8_net
     depends_on:
-      - yolov8_server
+ #     - yolov8_server
       - redis
-    environment:
-      - CAMERA_SOURCE=/dev/video0
-    devices:
-      - /dev/video0:/dev/video0
+#    environment:
+#      - CAMERA_SOURCE=/dev/video0
+#    devices:
+#      - /dev/video0:/dev/video0
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python3 -c 'import socket; s=socket.socket(); s.settimeout(2); exit(s.connect_ex((\"yolov8_server\",5000)))'"]
