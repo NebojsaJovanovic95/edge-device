@@ -63,6 +63,7 @@ services:
       context: ./app
       dockerfile: Dockerfile
     image: yolov8_server:latest
+    container_name: yolov8_server
     environment:
       MPLCONFIGDIR: /tmp/matplotlib
       YOLO_CONFIG_DIR: /tmp/ultralytics
