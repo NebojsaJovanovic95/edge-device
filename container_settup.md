@@ -53,7 +53,8 @@ podman run -d --replace\
   --env-file .env \
   --env-file .env.private \
   -v ./logs:/app/logs:Z \
-  test_app:latest
+  -v ./images:/app/output:Z \
+  test_aop:latest
 ## streaming_app
 podman run -d --replace\
   --name streaming_app \

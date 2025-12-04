@@ -137,6 +137,7 @@ services:
       - .env.private
     volumes:
       - ./logs:/app/logs:Z
+      - ./image:/app/output:ro
     networks:
       - yolov8_net
     depends_on:

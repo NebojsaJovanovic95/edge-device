@@ -7,7 +7,7 @@ def main():
 #    print("Runnning /detect test...")
 #    id = test_detection.run_test()
 #    print(f"Runnning /detection/{id} test...")
-#    test_detection_id.run_test(id=id)
+    test_detection_id.run_test(id=58790)
     print("Runnning /detections test...")
     test_detections.run_test()
 #    print("Runnning /stream test...")
