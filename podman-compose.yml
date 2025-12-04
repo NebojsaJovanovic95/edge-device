@@ -118,8 +118,8 @@ services:
       - redis
     environment:
       - CAMERA_SOURCE=/dev/video0
-    devices:
-      - /dev/video0:/dev/video0
+      - RTSP_CAMERA_SOURCE=rtsp://192.168.1.20:554/stream1
+      - FALLBACK_CAMERA_SOURCE=/app/input_video.mp4
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python3 -c 'import socket; s=socket.socket(); s.settimeout(2); exit(s.connect_ex((\"yolov8_server\",5000)))'"]

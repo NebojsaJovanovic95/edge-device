@@ -31,6 +31,50 @@ def frame_hash(frame: np.ndarray) -> int:
     resized = cv2.resize(gray, (64,64))
     return int(hashlib.md5(resized).hexdigest(), 16)
 
+def synthetic_frame():
+    frame = np.zeros(
+        (480, 640, 3),
+        dtype=np.uint8
+    )
+    cv2.putText(
+        frame,
+        text,
+        (20, 40),
+        cv2.FRONT_HERSHEY_SYMPLEX,
+        1,
+        (255, 255, 255),
+        2
+    )
+    timestamp = datetime.now(),strftime("%Y-%m-%d %H:%M:%S")
+    cv2.putText(
+        frame,
+        timestamp,
+        (20, 80),
+        cv2.FRONT_HERSHEY_SYMPLEX,
+        0.7,
+        (255, 255, 255),
+        2
+    )
+    return frame
+
+async def open_camera():
+    logger.info(f"Trying primary CAMERA_SOURCE: {CAMERA_SOURCE}")
+    cap = cv2.VideoCapture(CAMERA_SOURCE)
+
+    if cap.isOpened():
+        logger.info("Camera source opened successfully.")
+        return cap, "camera"
+
+    logger.warning("Primary camera failed. Trying fallback video.")
+    cap = cv2.VideoCapture(VIDEO_PATH)
+    
+    if cap.isOpened():
+        logger.info("Using fallback video file.")
+        return cap, "file"
+
+    logger.error("No camera & no fallback video. Using synthetic frames.")
+    return None, "synthetic"
+
 async def send_image_to_yolo(
     session,
     image_path=None,
@@ -85,31 +129,44 @@ async def process_images(image_bytes: bytes):
 
 async def process_video(session):
     prev_hash = None
-    cap = cv2.VideoCapture(CAMERA_SOURCE)
     prev_time = time.time()
+
+    cap, mode = await open_camera()
 
     while True:
         ret, frame = cap.read()
-        if not ret:
-            logger.info(f"[{__name__}]: Failed to read frame.")
-            continue
-        
+
+        if cap is not None:
+            ret, frame = cap.read()
+            if not ret:
+                logger.info(f"[{__name__}]: Failed to read frame.")
+                await asyncio.sleep(2)
+                cap, mode = await open_camera()
+                continue
+        else:
+            frame = synthetic_frame()
+
         current_time = time.time()
         if current_time - prev_time < SEND_INTERVAL:
+            await asyncio.sleep(0.01)
             continue
 
         prev_time = current_time
         
-        current_hash = frame_hash(frame)
+        try:
+            current_hash = frame_hash(frame)
+        except Exception:
+            current_hash = None
+
         if (prev_hash is None
             or abs(current_hash - prev_hash) > HASH_DIFF_THRESHOLD):
             prev_hash = current_hash
             _, buf = cv2.imencode('.jpg', frame)
-            frame_bytes = buf.tobytes()
             await send_image_to_yolo(
                 session,
-                image_bytes=frame_bytes
+                image_bytes=buf.tobytes()
             )
+        await asyncio.sleep(0.01)
 
 async def main():
     logger.info(f"{__name__} i am up...")
