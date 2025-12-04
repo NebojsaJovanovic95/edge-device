@@ -31,6 +31,36 @@ def frame_hash(frame: np.ndarray) -> int:
     resized = cv2.resize(gray, (64,64))
     return int(hashlib.md5(resized).hexdigest(), 16)
 
+def get_camera_source():
+    """
+    Return the first available source:
+    1. RTSP /env RTSP_CAMERA_SOURCE
+    2. Local webcam /dev/video (linux)
+    3. Fallback video (inferior windows device)
+    Returns cv2.VideoCapture object and a string indicating source
+    """
+    sources = []
+
+    rtsp_source = os.getenv("RTSP_CAMERA_SOURCE")
+    if rtsp_source:
+        sources.append((rtsp_source, "camera"))
+
+    if os.name =="posix" and os.path.exits("/dev/vodeo0"):
+        sources.append(("/dev/video0", "webcam"))
+
+    sources.append(("/app/input_video.mp4", "file"))
+
+    for src, label in sources:
+        cap = cv2.VideoCapture(src)
+        if cap.isOpened():
+            logger.info(f"Using {label} source: {src}")
+            return cap, label
+        else:
+            logger.warning(f"Failed to open {label} source: {src}")
+
+    logger.error("No camera/video available, using synthetic frames")
+    return None, "synthetic"
+
 def synthetic_frame():
     frame = np.zeros(
         (480, 640, 3),
@@ -56,24 +86,6 @@ def synthetic_frame():
         2
     )
     return frame
-
-async def open_camera():
-    logger.info(f"Trying primary CAMERA_SOURCE: {CAMERA_SOURCE}")
-    cap = cv2.VideoCapture(CAMERA_SOURCE)
-
-    if cap.isOpened():
-        logger.info("Camera source opened successfully.")
-        return cap, "camera"
-
-    logger.warning("Primary camera failed. Trying fallback video.")
-    cap = cv2.VideoCapture(VIDEO_PATH)
-    
-    if cap.isOpened():
-        logger.info("Using fallback video file.")
-        return cap, "file"
-
-    logger.error("No camera & no fallback video. Using synthetic frames.")
-    return None, "synthetic"
 
 async def send_image_to_yolo(
     session,
@@ -131,7 +143,7 @@ async def process_video(session):
     prev_hash = None
     prev_time = time.time()
 
-    cap, mode = await open_camera()
+    cap, mode = get_camera_source()
 
     while True:
         ret, frame = cap.read()
@@ -141,7 +153,7 @@ async def process_video(session):
             if not ret:
                 logger.info(f"[{__name__}]: Failed to read frame.")
                 await asyncio.sleep(2)
-                cap, mode = await open_camera()
+                cap, mode = get_camera_source()
                 continue
         else:
             frame = synthetic_frame()
