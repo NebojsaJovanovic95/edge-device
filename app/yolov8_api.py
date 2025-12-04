@@ -32,8 +32,6 @@ async def startup_event():
 @app.post("/stream")
 async def stream_image(file: UploadFile = File(...)):
     """Receive images and enqueue them for background processing."""
-
-￼
     contents = await file.read()
     await enqueue_image(contents, file.filename)
     return {
