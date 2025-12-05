@@ -17,10 +17,14 @@ logger = logging.getLogger("streaming_apps")
 image_directory = '/app/images'
 
 YOLO_API_URL: str = 'http://yolov8_server:5000/stream'
-VIDEO_PATH: str = "/app/input_video.mp4"
+RTSP_CAMERA_SOURCE: str = os.getenv(
+    "RTSP_CAMERA_SOURCE"
+)
 CAMERA_SOURCE: str = os.getenv(
-    "CAMERA_SOURCE",
-    VIDEO_PATH
+    "CAMERA_SOURCE"
+)
+FALLBACK_CAMERA_SOURCE: str = os.getenv(
+    "FALLBACK_CAMERA_SOURCE"
 )
 FRAME_INTERVAL: int = int(os.getenv("FRAME_INTERVAL", 5))
 HASH_DIFF_THRESHOLD = 1000
@@ -41,14 +45,13 @@ def get_camera_source():
     """
     sources = []
 
-    rtsp_source = os.getenv("RTSP_CAMERA_SOURCE")
-    if rtsp_source:
-        sources.append((rtsp_source, "camera"))
+    if RTSP_CAMERA_SOURCE:
+        sources.append((RTSP_CAMERA_SOURCE, "camera"))
 
-    if os.name =="posix" and os.path.exits("/dev/vodeo0"):
-        sources.append(("/dev/video0", "webcam"))
+    if os.name =="posix" and os.path.exists(CAMERA_SOURCE):
+        sources.append((CAMERA_SOURCE, "webcam"))
 
-    sources.append(("/app/input_video.mp4", "file"))
+    sources.append((FALLBACK_CAMERA_SOURCE, "file"))
 
     for src, label in sources:
         cap = cv2.VideoCapture(src)
