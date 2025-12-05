@@ -1,10 +1,13 @@
 import os, time, cv2
 import logging
 import aiohttp
+import socket
+from urllib.parse import urlparse
 import asyncio
 import numpy as np
 from io import BytesIO
 import hashlib
+from typing import Optional, Tuple
 
 logging.basicConfig(
     filename="/app/logs/streaming_app.log",
@@ -35,7 +38,33 @@ def frame_hash(frame: np.ndarray) -> int:
     resized = cv2.resize(gray, (64,64))
     return int(hashlib.md5(resized).hexdigest(), 16)
 
-def get_camera_source():
+
+def rtsp_available(rtsp_url: str, timeout=0.3) -> bool:
+    """
+    Fast, proper RTSP connectivity test.
+    - Checks IP resolves
+    - Checks TCP port is open (usually 554)
+    - Does NOT hang like OpenCV
+    """
+    if not rtsp_url:
+        return False
+
+    try:
+        parsed = urlparse(rtsp_url)
+        host = parsed.hostname
+        port = parsed.port or 554
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+
+        result = sock.connect_ex((host, port))
+        sock.close()
+
+        return result == 0  # port open → camera reachable
+    except:
+        return False
+
+def get_camera_source() -> tuple[Optional[cv2.VideoCapture], str]:
     """
     Return the first available source:
     1. RTSP /env RTSP_CAMERA_SOURCE
@@ -45,7 +74,7 @@ def get_camera_source():
     """
     sources = []
 
-    if RTSP_CAMERA_SOURCE:
+    if RTSP_CAMERA_SOURCE and rtsp_available(RTSP_CAMERA_SOURCE):
         sources.append((RTSP_CAMERA_SOURCE, "camera"))
 
     if os.name =="posix" and os.path.exists(CAMERA_SOURCE):
