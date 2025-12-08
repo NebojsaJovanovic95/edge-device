@@ -82,8 +82,13 @@ def get_camera_source() -> tuple[Optional[cv2.VideoCapture], str]:
 
     sources.append((FALLBACK_CAMERA_SOURCE, "file"))
 
+    logger.info(f"{RTSP_CAMERA_SOURCE}, {CAMERA_SOURCE}, {FALLBACK_CAMERA_SOURCE}")
+    logger.info(f"{sources}")
     for src, label in sources:
-        cap = cv2.VideoCapture(src)
+        if src == CAMERA_SOURCE:
+            cap = cv2.VideoCapture(0)
+        else:
+            cap = cv2.VideoCapture(src)
         if cap.isOpened():
             logger.info(f"Using {label} source: {src}")
             return cap, label
@@ -102,17 +107,17 @@ def synthetic_frame():
         frame,
         text,
         (20, 40),
-        cv2.FRONT_HERSHEY_SYMPLEX,
+        cv2.FONT_HERSHEY_SYMPLEX,
         1,
         (255, 255, 255),
         2
     )
-    timestamp = datetime.now(),strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cv2.putText(
         frame,
         timestamp,
         (20, 80),
-        cv2.FRONT_HERSHEY_SYMPLEX,
+        cv2.FONT_HERSHEY_SYMPLEX,
         0.7,
         (255, 255, 255),
         2
