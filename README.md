@@ -1,6 +1,26 @@
 # Edge Device Object Detection
 Yolov8 model inference on an edge device
 
+# Purpose / Vision
+Providing real-time, private, reliable video analytics on the edge device, avoiding use of cloud in the process control loop. Leveraging existing cameras on site to potentially provide additional process insight. Low hanging fruit would be PPE compliance and area access control.
+Access to detection data would be provided to the client for additional diagnosis as required. But regularly, only a heartbeat would be streamed to the cloud and wider integrated system.
+
+# How is this used?
+- Connect IP/RTSP cameras to the device
+- Run the Edge Device, which automatically:
+  - Pulls the stream
+  - Runs Yolo inference  
+  - Saves processed frames and detection results to a backend (DB/Minio)
+- View a web Dashboard (to be implemented)
+  - See processed video data (bounding boxes)
+  - Search by detection data
+  - validate model performance
+
+# Timing / Strategic Value - Why Bother?
+## Why Edge
+Use of cloud is very popular and has many application for wide business application. Edge computing, however fits the industries Hatch consults much better. Sites easily have space for a local machine, and cost of a linux based edge device is laughable compared to instrumentation that is regularly used. Control loops should not have cloud device inside it, it introduces unnecessary risk. Edge device is local and acts locally, yet when required additional compute power, backup and other cloud strengths can be leveraged when required.
+## Why Computer Vision
+This comes from an assumption that a camera would just be there anyway. There are some old sites that don't have cameras, but lets ignore that. Any industrial site should have cameras and a computer on site. There are many ways a camera feed can give additional information to the operator, even direct process insight (water level for example). Getting safety insight is valuable. Once you have the ability of who and what is going where you can derive process insight and operator value.
 # Project Architecture
 
 ```mermaid
