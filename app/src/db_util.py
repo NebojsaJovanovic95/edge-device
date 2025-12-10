@@ -251,7 +251,6 @@ class PostgresDb(BaseDb):
     ]
     def __init__(self, conn_str: str, table_name: str):
         self.conn_str = conn_str
-        self.table = table_name
         self._init_tables()
 
     def _get_conn(self):
@@ -397,10 +396,46 @@ class DetectionDb:
         self.cache = SqliteDb(sqlite_path)
         self.main_db = PostgresDb(
             postgres_dsn,
-            table_name=settings.POSTGRES_TABLE_NAME
         )
         self.cache.prune_cache(max_rows=100)
         self._start_sync_thread()
+
+    def insert_frame_with_detections(
+        self,
+        camera_id: str,
+        image_path: str,
+        detections: list[dict]
+    ) -> int:
+        """
+        High level insert:
+        - insert frame
+        - insert each detection
+        - Cache raw record for offline model_name
+        """
+        ts = int(time.time())
+        try:
+            frame_id = self.pg.insert_frame(
+                camera_id,
+                image_path,
+                ts
+            )
+            for det in detections:
+                self.pg.insert_detection(
+                    frame_id=frame_id,
+                    class_name=det["class"],
+                    confidence=det["confidence"],
+                    bbox=det["bbox"],
+                    ts=ts
+                )
+        except Exception as e:
+            logger.eror(f"Postgres insert failed, falling back to cache: {e}")
+            self.cache.insert_detection(
+                image_path,
+                detections,
+                ts
+            )
+            return -1
+        return frame_id
 
     def insert_detection(
         self,
