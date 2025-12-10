@@ -222,19 +222,37 @@ class SqliteDb(BaseDb):
 
 class PostgresDb(BaseDb):
     """POstgres main DB."""
-    SQL_CREATE_TABLE = """
-    CREATE TABLE IF NOT EXISTS {table} (
-        {id_col} SERIAL PRIMARY KEY,
-        {image_col} TEXT NOT NULL,
-        {data_col} JSONB NOT NULL,
-        {ts_col} BIGINT NOT NULL
-    )
+    SQL_CREATE_FRAMES = """
+    CREATE TABLE IF NOT EXISTS frame (
+        id SERIAL PRIMARY KEY,
+        image_path TEXT NOT NULL,
+        camera_id TEXT,
+        model_name TEXT,
+        created_at BIGINT NOT NULL
+    );
     """
 
+    SQL_CREATE_DETECTIONS = """
+    CREATE TABLE IF NOT EXISTS detections (
+        id SERIAL PRIMARY KEY,
+        frame_id INTEGER NOT NULL REFERENCES frames(id) ON DELETE CASCADE,
+        class_name TEXT NOT NULL,
+        confidence REAL NOT NULL,
+        bbox JSONB NOT NULL,      -- [x, y, w, h] or similar
+        attributes JSONB          -- optional additional metadata
+    );
+    """
+
+    SQL_INDEXES = [
+        "CREATE INDEX IF NOT EXISTS idx_frames_ts ON frames (created_at DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_frames_camera ON frames (camera_id);",
+        "CREATE INDEX IF NOT EXISTS idx_detections_class ON detections (class_name);",
+        "CREATE INDEX IF NOT EXISTS idx_detections_frame ON detections (frame_id);",
+    ]
     def __init__(self, conn_str: str, table_name: str):
         self.conn_str = conn_str
         self.table = table_name
-        self._init_table()
+        self._init_tables()
 
     def _get_conn(self):
         return psycopg2.connect(
@@ -242,45 +260,78 @@ class PostgresDb(BaseDb):
             cursor_factory=RealDictCursor
         )
     
-    def _init_table(self):
+    def _init_tables(self):
         # Format the stored SQL template with the actual table/column names
-        query = self.SQL_CREATE_TABLE.format(
-            table=self.table,
-            id_col=self.COL_ID,
-            image_col=self.COL_IMAGE_PATH,
-            data_col=self.COL_DETECTION_DATA,
-            ts_col=self.COL_CREATED_AT
-        )
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute(query)
+                cur.execute(self.SQL_CREATE_FRAMES)
+                cur.execute(self.SQL_CREATE_DETECTIONS)
+                for idx in self.SQL_INDEXES:
+                    cur.execute(idx)
                 conn.commit()
+        logger.info("Postgres: normalized schema initialized.")
+
+    def insert_frame(
+        self,
+        image_path,
+        camera_id,
+        model_name,
+        ts
+    ):
+        query = """
+        INSERT INTO frames (
+            image_path,
+            camera_id,
+            model_name,
+            created_at
+        ) VALUES (%s, %s, %s, %s)
+        RETURNING id;
+        """
+        with self._get_conn() as conn:
+            with self.cursor() as cur:
+                cur.execute(
+                    query,
+                    (
+                        image_path,
+                        camera_id,
+                        model_name,
+                        ts
+                    )
+                )
+                frame_id = cur.fetchone()["id"]
+                conn.commit()
+                return frame_id
 
     def insert_detection(
         self,
-        image_path: str,
-        detection_data: dict,
-        ts: Optional[int] = None
+        frame_id: uuid,
+        class_name: str,
+        confidence: float,
+        bbox,
+        attrs=None
     ) -> int:
-        ts = ts or int(time.time())
-        query = self._format_query(
-            self.SQL_INSERT,
-            self.table
-        )
-        logger.info(f"Query: {query} \ndata: ({image_path}, detection type: ({type(detection_data)}), {ts})")
+        query = """
+        INSERT INTO detections (
+            frame_id,
+            class_name,
+            confidence,
+            bbox,
+            attributes
+        ) VALUES (%s, %s, %s, %s, %s);
+        """
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     query,
                     (
-                        image_path,
-                        psycopg2.extras.Json(detection_data),
-                        ts
+                        frame_id,
+                        class_name,
+                        confidence,
+                        Json(bbox),
+                        Json(attrs or {})
                     )
                 )
-                inserted_id = cur.fetchone()[self.COL_ID]
-                conn.commit()
-                return inserted_id
+                conn.commit()            
 
     def get_detection_by_id(
         self,
@@ -290,20 +341,11 @@ class PostgresDb(BaseDb):
             self.SQL_SELECT_BY_ID,
             self.table
         )
+        qyery = "SELECT * FROM detections WHERE id=%s"
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(query, (detection_id,))
-                row = cur.fetchone()
-                if row:
-                    return {
-                        self.COL_ID: row[0],
-                        self.COL_IMAGE_PATH: row[1],
-                        self.COL_DETECTION_DATA: json.loads(
-                            row[2]
-                        ),
-                        self.COL_CREATED_AT: row[3]
-                    }
-                return None
+                return cur.fetchone()
 
     def get_recent(self, limit: int = 100) -> List[dict[str, Any]]:
         query = self._format_query(

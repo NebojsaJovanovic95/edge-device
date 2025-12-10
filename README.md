@@ -72,6 +72,32 @@ flowchart TB
     STORAGE_BUFFER <--> M
 ```
 
+# Next Steps
+## Build the platform not just single use cose
+- Add a plugin-style model loader
+  - place models in /models
+  - yolov8_model loads the chosen model from config
+  - Switching models requires 0 code changes
+- Implement a basic Dashboard
+  - View images
+  - View detections
+  - provide model selection (ppe/water/perimeter/custom)
+  - provide camera selection
+- Create a unified detection schema
+```
+{
+  "camera_id": "gate_1",
+  "timestamp": "2025-01-01T12:30:00Z",
+  "model": "ppe_v8",
+  "detections": [
+    {"class": "hardhat", "confidence": 0.91, "bbox": [...]},
+    {"class": "person", "confidence": 0.88, "bbox": [...]}
+  ]
+}
+
+```
+```
+```
 # Project structure
 ```
 .
