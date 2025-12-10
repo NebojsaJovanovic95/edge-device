@@ -347,27 +347,44 @@ class PostgresDb(BaseDb):
                 cur.execute(query, (detection_id,))
                 return cur.fetchone()
 
-    def get_recent(self, limit: int = 100) -> List[dict[str, Any]]:
-        query = self._format_query(
-            self.SQL_SELECT_RECENT,
-            self.table
-        )
+    def get_recent_frames(self, limit: int = 20) -> List[dict[str, Any]]:
+        query = """
+            SELECT * FROM frames
+            ORDER BY created_at DESC
+            LIMIT %s;
+        """
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(query, (limit,))
-                rows = cur.fetchall()
-                return [
-                    {
-                        self.COL_ID: row[0],
-                        self.COL_IMAGE_PATH: row[1],
-                        self.COL_DETECTION_DATA: json.loads(
-                            row[2]
-                        ),
-                        self.COL_CREATED_AT: row[3]
-                    }
-                    for row in rows
-                ]
-            
+                return cur.fetchall()
+
+    def get_detection_by_class(
+        self,
+        class_name: str,
+        limit: int = 50
+    ):
+        query = """
+            SELECT * FROM detections
+            WHERE class_name=%s
+            ORDER BY created_at DESC
+            LIMIT %s;
+        """
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, (class_name, limit))
+                return cur.fetchall()
+
+    def get_detections_for_frame(self, frame_id: int):
+        query = """
+            SELECT * FROM detections
+            WHERE frame_id=%s
+            ORDER BY id ASC;
+        """
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, (frame_id,))
+                return cur.fetchall()
+
 
 class DetectionDb:
     """High-level interface combining Postgres + SQLite cache with offline handling."""
