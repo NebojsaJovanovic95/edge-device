@@ -8,3 +8,6 @@ def run_test():
     
     print("Status code:", response.status_code)
     print("Response:", response.json())
+    data = response.json()
+    return [detection["id"] for detection in data["detections"]]
+

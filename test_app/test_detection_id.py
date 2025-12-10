@@ -19,8 +19,8 @@ def run_test(id: int = TEST_ID):
 
     # 2️⃣ Save streamed image temporarily to disk
     os.makedirs("/app/output", exist_ok=True)
-    image_path = "/app/output/detection_raw.jpg"
-    output_path = "/app/output/detection_id.jpg"
+    image_path = f"/app/output/detection_raw_{id}.jpg"
+    output_path = f"/app/output/detection_id_{id}.jpg"
 
     with open(image_path, "wb") as f:
         for chunk in response.iter_content(1024):

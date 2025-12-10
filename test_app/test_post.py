@@ -4,13 +4,11 @@ import test_detections
 import test_stream
 
 def main():
-#    print("Runnning /detect test...")
-#    id = test_detection.run_test()
-#    print(f"Runnning /detection/{id} test...")
-    test_detection_id.run_test(id=58790)
-    print("Runnning /detections test...")
-    test_detections.run_test()
-#    print("Runnning /stream test...")
+    ids = test_detections.run_test()
+    print(f"Ids: {ids}")
+    for id in ids:
+        test_detection_id.run_test(id=id)
+        print(f"Runnning /detections/{id} test...")
 #    test_stream.run_test()
 
 if __name__ == "__main__":
