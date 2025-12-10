@@ -435,56 +435,17 @@ class DetectionDb:
                 ts
             )
             return -1
+
         return frame_id
 
-    def insert_detection(
-        self,
-        image_path: str,
-        detection_data: dict[str, Any]
-    ) -> int:
-        """Insert into both cache and main DB."""
-        ts: datetime = int(time.time())
-        local_id = self.cache.insert_detection(
-            image_path,
-            detection_data,
-            ts
-        )
-        try:
-            pg_id = self.main_db.insert_detection(
-                image_path,
-                detection_data,
-                ts
-            )
-            self.cache.mark_synced(
-                local_id,
-                pg_id
-            )
-            return pg_id
-        except Exception as e:
-            logger.warning(
-                f"Postgres insert failed: {e}, keeping local cache ID {local_id}"
-            )
-            return local_id
+    def get_detection_by_id(self, det_id: int):
+        return self.pg.get_detection_by_id(det_id)
 
-    def get_detection_by_id(
-        self,
-        detection_id: int
-    ) -> Optional[dict[str, Any]]:
-        """Try cache first, then main DB."""
-        cached = self.cache.get_detection_by_id(detection_id)
-        if cached:
-            return cached
-        record = self.main_db.get_detection_by_id(detection_id)
-        if record:
-            self.cache.insert_detection(
-                record[BaseDb.COL_IMAGE_PATH],
-                record[BaseDb.COL_DETECTION_DATA],
-                record[BaseDb.COL_CREATED_AT],
-            )
-        return record
+    def get_recent_frames(self, limit=20):
+        return self.pg.get_recent_frames(limit)
 
-    def get_recent(self, limit: int = 10) -> List[dict]:
-        return self.cache.get_recent(limit)
+    def get_detection_by_class(self, class_name: str, limit=50):
+        return self.pg.get_detections_for_frame(frame_id)
     
     def _sync_unsynced(self):
         """Background thread to push unsynced cache rows to Postgres."""
@@ -494,11 +455,23 @@ class DetectionDb:
             synced_any = False
             for row in unsynced:
                 try:
-                    pg_id = self.main_db.insert_detection(
-                        image_path=row[BaseDb.COL_IMAGE_PATH],
-                        detection_data=json.loads(row[BaseDb.COL_DETECTION_DATA]),
+                    frame_id = self.pg.insert_frame(
+                        camera_id=row.get(
+                            "camera_id",
+                            "unknown"
+                        ),
+                        image_path=row["image_path"],
                         ts=row[BaseDb.COL_CREATED_AT]
                     )
+                    for det in json.loads(row[BaseDb.COL_DETECTION_DATA]):
+                        self.pg.insert_detection(
+                            frame_id=frame_id,
+                            class_name=det["class"],
+                            confidence=det["confidence"],
+                            bbox=det["bbox"],
+                            ts=row[BaseDb.COL_CREATED_AT]
+                        )
+
                     self.cache.mark_synced(row['id'], pg_id)
                     logger.info(
                         f"Synced local row {row['id']} -> Postgres ID {pg_id}"
@@ -511,6 +484,7 @@ class DetectionDb:
                     )
                     delay = min(delay * 2, 300)
                     break
+
             if synced_any:
                 try:
                     self.cache.prune_cache(max_rows=100)
@@ -521,6 +495,7 @@ class DetectionDb:
                     logger.warning(
                         f"Cache pruning failed: {e}"
                     )
+
             time.sleep(delay)
     
     def _start_sync_thread(self):
