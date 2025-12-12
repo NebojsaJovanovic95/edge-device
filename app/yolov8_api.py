@@ -79,7 +79,7 @@ async def detect(
     
     detection_data: json = results[0].tojson()
 
-    detection_id = db.insert_detection(
+    detection_id = db.insert_frame_with_detections(
         str(image_path),
         json.loads(detection_data)
     )
@@ -99,7 +99,7 @@ async def detect(
 @app.get("/detections")
 async def get_all_detections() -> JSONResponse:
     return JSONResponse(
-        {"detections": db.get_recent(limit=20)}
+        {"detections": db.get_recent_frames(limit=20)}
     )
 
 @app.get("/detection/{id}")

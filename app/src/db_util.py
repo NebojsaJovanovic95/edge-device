@@ -233,9 +233,9 @@ class PostgresDb(BaseDb):
     """
 
     SQL_CREATE_DETECTIONS = """
-    CREATE TABLE IF NOT EXISTS detections (
+    CREATE TABLE IF NOT EXISTS detection (
         id SERIAL PRIMARY KEY,
-        frame_id INTEGER NOT NULL REFERENCES frames(id) ON DELETE CASCADE,
+        frame_id INTEGER NOT NULL REFERENCES frame(id) ON DELETE CASCADE,
         class_name TEXT NOT NULL,
         confidence REAL NOT NULL,
         bbox JSONB NOT NULL,      -- [x, y, w, h] or similar
@@ -244,12 +244,12 @@ class PostgresDb(BaseDb):
     """
 
     SQL_INDEXES = [
-        "CREATE INDEX IF NOT EXISTS idx_frames_ts ON frames (created_at DESC);",
-        "CREATE INDEX IF NOT EXISTS idx_frames_camera ON frames (camera_id);",
-        "CREATE INDEX IF NOT EXISTS idx_detections_class ON detections (class_name);",
-        "CREATE INDEX IF NOT EXISTS idx_detections_frame ON detections (frame_id);",
+        "CREATE INDEX IF NOT EXISTS idx_frames_ts ON frame (created_at DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_frames_camera ON frame (camera_id);",
+        "CREATE INDEX IF NOT EXISTS idx_detections_class ON detection (class_name);",
+        "CREATE INDEX IF NOT EXISTS idx_detections_frame ON detection (frame_id);",
     ]
-    def __init__(self, conn_str: str, table_name: str):
+    def __init__(self, conn_str: str):
         self.conn_str = conn_str
         self._init_tables()
 
@@ -278,7 +278,7 @@ class PostgresDb(BaseDb):
         ts
     ):
         query = """
-        INSERT INTO frames (
+        INSERT INTO frame (
             image_path,
             camera_id,
             model_name,
@@ -310,7 +310,7 @@ class PostgresDb(BaseDb):
         attrs=None
     ) -> int:
         query = """
-        INSERT INTO detections (
+        INSERT INTO detection (
             frame_id,
             class_name,
             confidence,
@@ -340,7 +340,7 @@ class PostgresDb(BaseDb):
             self.SQL_SELECT_BY_ID,
             self.table
         )
-        qyery = "SELECT * FROM detections WHERE id=%s"
+        qyery = "SELECT * FROM detection WHERE id=%s"
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(query, (detection_id,))
@@ -348,7 +348,7 @@ class PostgresDb(BaseDb):
 
     def get_recent_frames(self, limit: int = 20) -> List[dict[str, Any]]:
         query = """
-            SELECT * FROM frames
+            SELECT * FROM frame
             ORDER BY created_at DESC
             LIMIT %s;
         """
@@ -363,7 +363,7 @@ class PostgresDb(BaseDb):
         limit: int = 50
     ):
         query = """
-            SELECT * FROM detections
+            SELECT * FROM detection
             WHERE class_name=%s
             ORDER BY created_at DESC
             LIMIT %s;
@@ -394,7 +394,7 @@ class DetectionDb:
         sqlite_path: str
     ):
         self.cache = SqliteDb(sqlite_path)
-        self.main_db = PostgresDb(
+        self.pg = PostgresDb(
             postgres_dsn,
         )
         self.cache.prune_cache(max_rows=100)
