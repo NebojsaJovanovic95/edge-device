@@ -56,72 +56,35 @@ class BaseDb:
 
 
 class SqliteDb(BaseDb):
-    SQLITE_TABLE_NAME = "cache_detections"
+    """Two-table SQLite cache mirroring Postgres: frame + detection."""
 
-    SQL_CREATE_TABLE = f"""
-        CREATE TABLE IF NOT EXISTS {SQLITE_TABLE_NAME} (
-            {BaseDb.COL_ID} INTEGER PRIMARY KEY AUTOINCREMENT,
-            {BaseDb.COL_IMAGE_PATH} TEXT NOT NULL,
-            {BaseDb.COL_DETECTION_DATA} TEXT NOT NULL,
-            {BaseDb.COL_CREATED_AT} REAL NOT NULL,
-            {BaseDb.COL_SYNCED} INTEGER DEFAULT 0
-        )
+    SQL_CREATE_FRAME = """
+    CREATE TABLE IF NOT EXISTS frame (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        image_path TEXT NOT NULL,
+        camera_id TEXT,
+        model_name TEXT,
+        created_at INTEGER NOT NULL
+    );
     """
 
-    SQL_SELECT_UNSYNCED = f"""
-        SELECT * FROM {SQLITE_TABLE_NAME} WHERE {BaseDb.COL_SYNCED}=0
-        ORDER BY {BaseDb.COL_CREATED_AT} ASC
+    SQL_CREATE_DETECTION = """
+    CREATE TABLE IF NOT EXISTS detection (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        frame_id INTEGER NOT NULL REFERENCES frame(id) ON DELETE CASCADE,
+        class_name TEXT NOT NULL,
+        confidence REAL NOT NULL,
+        bbox TEXT NOT NULL,      -- store as JSON string
+        attributes TEXT,         -- optional JSON metadata
+        created_at INTEGER NOT NULL
+    );
     """
 
-    SQL_UPDATE_SYNCED = f"""
-        UPDATE {SQLITE_TABLE_NAME} SET {BaseDb.COL_ID}=?, {BaseDb.COL_SYNCED}=1
-        WHERE rowid=?
-    """
-
-    SQL_INSERT = f"""
-        INSERT INTO {SQLITE_TABLE_NAME} (
-            {BaseDb.COL_IMAGE_PATH},
-            {BaseDb.COL_DETECTION_DATA},
-            {BaseDb.COL_CREATED_AT},
-            {BaseDb.COL_SYNCED}
-        )
-        VALUES (?, ?, ?, 0)
-    """
-
-    SQL_INSERT_WITH_ID = f"""
-        INSERT INTO {SQLITE_TABLE_NAME} (
-            {BaseDb.COL_ID},
-            {BaseDb.COL_IMAGE_PATH},
-            {BaseDb.COL_DETECTION_DATA},
-            {BaseDb.COL_CREATED_AT},
-            {BaseDb.COL_SYNCED}
-        )
-        VALUES (?, ?, ?, ?, 1)
-    """
-
-    SQL_SELECT_BY_ID = f"""
-        SELECT *
-        FROM {SQLITE_TABLE_NAME}
-        WHERE {BaseDb.COL_ID}=?
-    """
-
-    SQL_SELECT_RECENT = f"""
-        SELECT *
-        FROM {SQLITE_TABLE_NAME}
-        ORDER BY {BaseDb.COL_CREATED_AT} DESC
-        LIMIT ?
-    """
-
-    SQL_PRUNE = f"""
-        DELETE FROM {SQLITE_TABLE_NAME}
-        WHERE {BaseDb.COL_ID} NOT IN (
-            SELECT {BaseDb.COL_ID}
-            FROM {SQLITE_TABLE_NAME}
-            ORDER BY {BaseDb.COL_CREATED_AT} DESC
-            LIMIT ?
-        )
-    """
-
+    SQL_INDEXES = [
+        "CREATE INDEX IF NOT EXISTS idx_frame_created_at ON frame(created_at DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_detection_class ON detection(class_name);",
+        "CREATE INDEX IF NOT EXISTS idx_detection_frame ON detection(frame_id);",
+    ]
     def __init__(
         self,
         db_path: str = settings.CACHE_DB_PATH
@@ -134,42 +97,105 @@ class SqliteDb(BaseDb):
 
     def _init_db(self):
         with self._get_conn() as conn:
-            conn.execute(self.SQL_CREATE_TABLE)
+            conn.execute(self.SQL_CREATE_FRAME)
+            conn.execute(self.SQL_CREATE_DETECTION)
+            for idx in self.SQL_INDEXES:
+                conn.execute(idx)
             conn.commit()
+        logger.infor("SQLite: Cache schema initialized.")
 
-    def insert_detection(
+    def insert_frame(
         self,
         image_path: str,
-        detection_data: dict[str, Any],
-        ts: Optional[int] = None,
-        id_override: Optional[int] = None
+        camera_id: str = None,
+        model_name: str = None,
+        ts: Optional[int] = None
     ) -> int:
         ts = ts or int(time.time())
         with self._get_conn() as conn:
-            cursor = conn.cursor()
-            if id_override:
-                cursor.execute(
-                    self.SQL_INSERT_WITH_ID,
-                    (
-                        id_override,
-                        image_path,
-                        json.dumps(detection_data),
-                        ts
-                    )
+            cursor.conn.execute(
+                """
+                INSERT INTO frame (
+                    image_path,
+                    camera_id,
+                    model_name,
+                    created_at
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (
+                    image_path,
+                    camera_id,
+                    model_name,
+                    ts
                 )
-                conn.commit()
-                return id_override
-            else:
-                cursor.execute(
-                    self.SQL_INSERT,
-                    (
-                        image_path,
-                        json.dumps(detection_data),
-                        ts
-                    )
-                )
+            )
             conn.commit()
             return cursor.lastrowid
+
+    def get_recent_frames(self, limit: int = 20) -> List[dict]:
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM frame ORDER BY created_at DESC LIMIT ?",
+                (limit,)
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def insert_detection(
+        self,
+        frame_id: int,
+        class_name: str,
+        confidence: float,
+        bbox: dict,
+        attrs: dict = None,
+        ts: Optional[int] = None
+    ) -> int:
+        ts = ts or int(time.time())
+        with self._get_conn() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO detection (
+                    frame_id,
+                    class_name,
+                    confidence,
+                    bbox,
+                    attributes,
+                    created_at,
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    frame_id,
+                    class_name,
+                    confidence,
+                    json.dumps(bbox),
+                    json.dumps(attrs or {}),
+                    ts
+                )
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_detection_for_frame(self, frame_id: int) -> List[dict]:
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM detection WHERE frame_id=? ORDER BY id ASC",
+                (frame_id,)
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_detection_by_class(
+        self,
+        class_name: str,
+        limit: int = 50
+    ) -> List[dict]:
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM detection WHERE class_name=? ORDER BY created_at DESC LIMIT ?",
+                (class_name, limit)
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
     def get_detection_by_id(
         self,
@@ -222,7 +248,7 @@ class SqliteDb(BaseDb):
 
 class PostgresDb(BaseDb):
     """POstgres main DB."""
-    SQL_CREATE_FRAMES = """
+    SQL_CREATE_FRAME = """
     CREATE TABLE IF NOT EXISTS frame (
         id SERIAL PRIMARY KEY,
         image_path TEXT NOT NULL,
@@ -232,7 +258,7 @@ class PostgresDb(BaseDb):
     );
     """
 
-    SQL_CREATE_DETECTIONS = """
+    SQL_CREATE_DETECTION = """
     CREATE TABLE IF NOT EXISTS detection (
         id SERIAL PRIMARY KEY,
         frame_id INTEGER NOT NULL REFERENCES frame(id) ON DELETE CASCADE,
@@ -263,8 +289,8 @@ class PostgresDb(BaseDb):
         # Format the stored SQL template with the actual table/column names
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute(self.SQL_CREATE_FRAMES)
-                cur.execute(self.SQL_CREATE_DETECTIONS)
+                cur.execute(self.SQL_CREATE_FRAME)
+                cur.execute(self.SQL_CREATE_DETECTION)
                 for idx in self.SQL_INDEXES:
                     cur.execute(idx)
                 conn.commit()
