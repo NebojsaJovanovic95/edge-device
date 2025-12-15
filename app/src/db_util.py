@@ -10,6 +10,8 @@ from psycopg2.extras import RealDictCursor, Json
 from src.config import settings
 from psycopg2 import OperationalError
 
+MAX_ROW_LIMIT = 1000
+
 class BaseDb:
     """Base class storing common SQL strings and helper logic."""
 
@@ -410,6 +412,7 @@ class PostgresDb(BaseDb):
                 )
                 detections = cur.fetchall()
                 result["detections"] = [dict(d) for d in detections]
+        return result
 
     def get_detection_by_id(
         self,
@@ -425,42 +428,92 @@ class PostgresDb(BaseDb):
                 cur.execute(query, (detection_id,))
                 return cur.fetchone()
 
-    def get_recent_frames(self, limit: int = 20) -> List[dict[str, Any]]:
-        query = """
-            SELECT * FROM frame
-            ORDER BY created_at DESC
-            LIMIT %s;
-        """
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(query, (limit,))
-                return cur.fetchall()
-
-    def get_detection_by_class(
+    def get_frames(
         self,
-        class_name: str,
-        limit: int = 50
-    ):
-        query = """
-            SELECT * FROM detection
-            WHERE class_name=%s
-            ORDER BY created_at DESC
-            LIMIT %s;
-        """
+        *,
+        camera_id: str = None,
+        model_name: str = None,
+        created_after: int = None,
+        limit: int = 20,
+        offset: int = 0
+    ) -> List[dict[str, Any]]:
+        query = "SELECT * FROM frame"
+        conditions = []
+        params = {}
+
+        if camera_id:
+            conditions.append("camera_id = %(camera_id)s")
+            params["camera_id"] = camera_id
+
+        if model_name:
+            conditions.append("model_name = %(model_name)s")
+            params["model_name"] = model_name
+
+        if created_after:
+            conditions.append("created_at > %(created_after)s")
+            params["created_after"] = created_after
+
+        if conditions:
+            query += "WHERE " + " AND ".join(conditions)
+        query += "ORDER BY id DESC"
+
+        if limit:
+            query += " LIMIT = %(limit)s"
+            params["limit"] = min(limit, MAX_ROW_LIMIT)
+
+        if offset:
+            query += " OFFSET = %(offset)s"
+            params["offset"] = offset
+
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute(query, (class_name, limit))
+                cur.execute(query, params)
                 return cur.fetchall()
 
-    def get_detections_for_frame(self, frame_id: int):
-        query = """
-            SELECT * FROM detections
-            WHERE frame_id=%s
-            ORDER BY id ASC;
-        """
+    def get_detections(
+        self,
+        *,
+        frame_id: int = None,
+        class_name: str = None,
+        min_confidence: float = None,
+        # attributes: json = None,
+        limit: int = None,
+        offset: int = None
+    ):
+        query = "SELECT * FROM detection"
+        conditions = []
+        params = {}
+
+        if frame_id:
+            conditions.append("frame_id = %(frame_id)s")
+            params["frame_id"] = frame_id
+
+        if class_name:
+            conditions.append("class_name = %(class_name)s")
+            params["class_name"] = class_name
+
+        if min_confidence:
+            conditions.append("confidence > %(min_confidence)s")
+            params["min_confidence"] = min_confidence
+
+        # if attributes:
+        #    conditions.append("attributes = %(attributes)s")
+        #    params["attributes"] = attributes
+
+        if conditions:
+            query += "WHERE " + " AND ".join(conditions)
+        query += "ORDER BY id DESC"
+
+        if limit:
+            query += " LIMIT = %(limit)s"
+            params["limit"] = min(limit, MAX_ROW_LIMIT)
+        if offset:
+            query += " OFFSET = %(offset)s"
+            params["offset"] = offset
+
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute(query, (frame_id,))
+                cur.execute(query, params)
                 return cur.fetchall()
 
 
