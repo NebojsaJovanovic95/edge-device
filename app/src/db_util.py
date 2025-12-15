@@ -527,8 +527,8 @@ class DetectionDb:
         return self.pg.get_frame_by_id(frame_id)
 
     def get_detection_by_class(self, class_name: str, limit=50):
-        return self.pg.get_detections_for_frame(frame_id)
-    
+        return self.pg.get_detection_by_class(class_name, limit=limit)
+
     def _sync_unsynced(self):
         """Background thread to push unsynced cache rows to Postgres."""
         delay = 5
