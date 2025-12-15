@@ -81,7 +81,7 @@ async def process_queue():
             with open(tmp_path, "rb") as f:
                 minio_path = minio_storage.save_image(f, filename)
 
-            db.insert_detection(
+            db.insert_frame_with_detections(
                 image_path=str(minio_path),
                 detection_data=detection_data
             )

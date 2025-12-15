@@ -251,7 +251,7 @@ class SqliteDb(BaseDb):
                 (limit,)
             )
             return [dict(row) for row in cursor.fetchall()]
-    
+
     def prune_cache(
         self,
         max_rows: int = 100
@@ -263,7 +263,7 @@ class SqliteDb(BaseDb):
                 (max_rows,)
             )
             conn.commit()
-        
+
 
 class PostgresDb(BaseDb):
     """POstgres main DB."""
