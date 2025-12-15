@@ -64,7 +64,7 @@ class SqliteDb(BaseDb):
         image_path TEXT NOT NULL,
         camera_id TEXT,
         model_name TEXT,
-        created_at INTEGER NOT NULL
+        created_at INTEGER NOT NULL,
         synced INTEGER NOT NULL DEAFAULT 0
     );
     """
