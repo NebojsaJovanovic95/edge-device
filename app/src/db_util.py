@@ -65,6 +65,7 @@ class SqliteDb(BaseDb):
         camera_id TEXT,
         model_name TEXT,
         created_at INTEGER NOT NULL
+        synced INTEGER NOT NULL DEAFAULT 0
     );
     """
 
@@ -85,6 +86,24 @@ class SqliteDb(BaseDb):
         "CREATE INDEX IF NOT EXISTS idx_detection_class ON detection(class_name);",
         "CREATE INDEX IF NOT EXISTS idx_detection_frame ON detection(frame_id);",
     ]
+
+    SQL_PRUNE = """
+        DELETE FROM frame
+        WHERE id NOT IN (
+            SELECT id FROM frame
+            ORDER BY created_at DESC
+            LIMIT ?
+        );
+    """
+
+    SQL_SELECT_UNSYNCED = """
+        SELECT f.*, d.*
+        FROM frame f
+        JOIN detection d ON d.frame_id = f.id
+        WHERE f.synced = 0
+        ORDER BY f.created_at, d.id;
+    """
+
     def __init__(
         self,
         db_path: str = settings.CACHE_DB_PATH
@@ -102,7 +121,7 @@ class SqliteDb(BaseDb):
             for idx in self.SQL_INDEXES:
                 conn.execute(idx)
             conn.commit()
-        logger.infor("SQLite: Cache schema initialized.")
+        logger.info("SQLite: Cache schema initialized.")
 
     def insert_frame(
         self,
