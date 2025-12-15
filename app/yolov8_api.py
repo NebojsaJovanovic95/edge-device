@@ -104,7 +104,7 @@ async def get_all_detections() -> JSONResponse:
 
 @app.get("/detection/{id}")
 async def get_detection(id: int):
-    detection = db.get_detection_by_id(id)
+    detection = db.get_frame_by_id(id)
     if detection is None:
         raise HTTPException(
             status_code=404,

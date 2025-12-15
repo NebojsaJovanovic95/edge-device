@@ -375,7 +375,41 @@ class PostgresDb(BaseDb):
                         Json(attrs or {})
                     )
                 )
-                conn.commit()            
+                conn.commit()
+
+    def get_frame_by_id(
+        self,
+        frame_id: int
+    ) -> Optional[dict]:
+        """
+        Fetch frame with frame_id and get all detections with frame_id = frame_id
+        {
+            "frama": {frame entry},
+            "detections": [
+                ... {detection where frame_id = frame_id}
+            ]
+        """
+        result = {
+            "frame": None,
+            "detections": []
+        }
+        query_frame = "SELECT * FROM frame WHERE id=%s"
+        query_detections = "SELECT * FROM detection WHERE frame_id=%s"
+        with self._get_conn() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    query_frame,
+                    (frame_id,)
+                )
+                frame = cur.fetchone()
+                if not frame:
+                    return None
+                cur.execute(
+                    query_detections,
+                    (frame_id,)
+                )
+                detections = cur.fetchall()
+                result["detections"] = [dict(d) for d in detections]
 
     def get_detection_by_id(
         self,
@@ -488,6 +522,9 @@ class DetectionDb:
 
     def get_recent_frames(self, limit=20):
         return self.pg.get_recent_frames(limit)
+
+    def get_frame_by_id(self, frame_id: int):
+        return self.pg.get_frame_by_id(frame_id)
 
     def get_detection_by_class(self, class_name: str, limit=50):
         return self.pg.get_detections_for_frame(frame_id)
