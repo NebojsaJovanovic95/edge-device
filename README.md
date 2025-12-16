@@ -185,4 +185,7 @@ ffplay -rtsp_transport tcp "rtsp://192.168.1.10:554/user=admin&password=&channel
 ```
 sudo ip addr add 192.168.1.100/24 dev wlan0
 ```
+<<<<<<< HEAD
+>>>>>>> 86dc98a (Camera settings reminder added)
+=======
 >>>>>>> 86dc98a (Camera settings reminder added)
