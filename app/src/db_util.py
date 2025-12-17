@@ -386,7 +386,7 @@ class PostgresDb(BaseDb):
         """
         Fetch frame with frame_id and get all detections with frame_id = frame_id
         {
-            "frama": {frame entry},
+            "frame": {frame entry},
             "detections": [
                 ... {detection where frame_id = frame_id}
             ]

@@ -105,16 +105,16 @@ async def get_all_detections() -> JSONResponse:
 
 @app.get("/detection/{id}")
 async def get_detection(id: int):
-    detection = db.get_frame_by_id(id)
-    if detection is None:
+    frame_with_detections = db.get_frame_by_id(id)
+    if frame_with_detections is None:
         raise HTTPException(
             status_code=404,
             detail="Detection not found"
         )
-    logger.info(f"[{NAME}]: Fetched detection: s{detection}")
+    logger.info(f"[{NAME}]: Fetched detection: s{frame_with_detections}")
     
-    image_path: str = detection["image_path"]
-    detection_data: list[dict[str, Any]] = json.loads(detection["detection_data"])
+    image_path: str = frame_with_detections["frame"]["image_path"]
+    detection_data: list[dict[str, Any]] = frame_with_detections["detections"]
 
     def image_stream() -> Any:
         with minio_storage.load_image(image_path) as image_file:
