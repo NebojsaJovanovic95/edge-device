@@ -319,10 +319,10 @@ class PostgresDb(BaseDb):
 
     def insert_frame(
         self,
-        image_path,
-        camera_id,
-        model_name,
-        ts
+        image_path: str,
+        camera_id: int,
+        model_name: str,
+        ts: int
     ) -> int:
         query = """
         INSERT INTO frame (
@@ -334,7 +334,7 @@ class PostgresDb(BaseDb):
         RETURNING id;
         """
         with self._get_conn() as conn:
-            with self.cursor() as cur:
+            with conn.cursor() as cur:
                 cur.execute(
                     query,
                     (
@@ -353,7 +353,7 @@ class PostgresDb(BaseDb):
         frame_id: int,
         class_name: str,
         confidence: float,
-        bbox,
+        bbox: dict,
         attrs=None
     ) -> int:
         query = """
@@ -534,9 +534,10 @@ class DetectionDb:
 
     def insert_frame_with_detections(
         self,
-        camera_id: str = 0,
+        camera_id: str,
         image_path: str,
-        detections: list[dict]
+        raw_detections: json,
+        model_name: str,
     ) -> int:
         """
         High level insert:
@@ -545,19 +546,20 @@ class DetectionDb:
         - Cache raw record for offline model_name
         """
         ts = int(time.time())
+        detections = [self._normalize_detection(d) for d in raw_detections]
         try:
             frame_id = self.pg.insert_frame(
-                camera_id,
-                image_path,
-                ts
+                camera_id=camera_id,
+                image_path=image_path,
+                model_name=model_name,
+                ts=ts
             )
             for det in detections:
                 self.pg.insert_detection(
                     frame_id=frame_id,
-                    class_name=det["class"],
+                    class_name=det["class_name"],
                     confidence=det["confidence"],
                     bbox=det["bbox"],
-                    ts=ts
                 )
         except Exception as e:
             logger.eror(f"Postgres insert failed, falling back to cache: {e}")
@@ -610,6 +612,14 @@ class DetectionDb:
             limit = limit,
             offset = offset
         )
+
+    def _normalize_detection(self, det: dict) -> dict:
+        return {
+            "class_name": det.get("class") or det.get("name"),
+            "confidence": float(det["confidence"]),
+            "bbox": det.get("bbox") or det.get("box"),
+            "attributes": det.get("attributes", {})
+        }
 
     def _sync_unsynced(self):
         """Background thread to push unsynced cache rows to Postgres."""

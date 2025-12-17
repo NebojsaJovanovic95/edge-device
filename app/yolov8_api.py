@@ -77,12 +77,12 @@ async def detect(
         detection_data = result["detection"]
 
     detection_data: json = results[0].tojson()
-    detections = [detection for detection in json.loads(detection_data)]
 
     detection_id = db.insert_frame_with_detections(
         camera_id = 0,
         image_path = str(image_path),
-        detections=detections
+        raw_detections = detection_data,
+        model_name = settings.MODEL_NAME
     )
 
     logger.info(f"[{NAME}]: Saved detection {detection_id}.")

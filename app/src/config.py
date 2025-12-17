@@ -5,6 +5,7 @@ from shared_config import settings as shared_settings
 
 
 class Settings:
+    MODEL_NAME: str = "YOLOv8"
     BASE_DIR: str = "/app"
 
     CACHE_DB_PATH: str = os.path.join(BASE_DIR, "cache", "detection.db")

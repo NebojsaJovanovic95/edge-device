@@ -77,17 +77,18 @@ async def process_queue():
 
             detection_data = result["detection"]
 
-
             with open(tmp_path, "rb") as f:
                 minio_path = minio_storage.save_image(f, filename)
 
             db.insert_frame_with_detections(
+                camera_id = 0,
                 image_path=str(minio_path),
-                detection_data=detection_data
+                raw_detections=detection_data,
+                model_name=settings.MODEL_NAME
             )
             logger.info(f"[{NAME}] Processed and uploaded {filename}")
 
             os.remove(tmp_path)
-        
+
         except Exception as e:
             logger.exception(f"[{NAME}] Error processing {filename}: {e}")
