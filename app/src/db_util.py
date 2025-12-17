@@ -323,7 +323,7 @@ class PostgresDb(BaseDb):
         camera_id,
         model_name,
         ts
-    ):
+    ) -> int:
         query = """
         INSERT INTO frame (
             image_path,
@@ -350,7 +350,7 @@ class PostgresDb(BaseDb):
 
     def insert_detection(
         self,
-        frame_id: uuid,
+        frame_id: int,
         class_name: str,
         confidence: float,
         bbox,
@@ -454,15 +454,15 @@ class PostgresDb(BaseDb):
             params["created_after"] = created_after
 
         if conditions:
-            query += "WHERE " + " AND ".join(conditions)
-        query += "ORDER BY id DESC"
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY id DESC"
 
-        if limit:
-            query += " LIMIT = %(limit)s"
+        if limit is not None:
+            query += " LIMIT %(limit)s"
             params["limit"] = min(limit, MAX_ROW_LIMIT)
 
-        if offset:
-            query += " OFFSET = %(offset)s"
+        if offset is not None:
+            query += " OFFSET %(offset)s"
             params["offset"] = offset
 
         with self._get_conn() as conn:
@@ -501,14 +501,14 @@ class PostgresDb(BaseDb):
         #    params["attributes"] = attributes
 
         if conditions:
-            query += "WHERE " + " AND ".join(conditions)
-        query += "ORDER BY id DESC"
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY id DESC"
 
-        if limit:
-            query += " LIMIT = %(limit)s"
+        if limit is not None:
+            query += " LIMIT %(limit)s"
             params["limit"] = min(limit, MAX_ROW_LIMIT)
-        if offset:
-            query += " OFFSET = %(offset)s"
+        if offset is not None:
+            query += " OFFSET %(offset)s"
             params["offset"] = offset
 
         with self._get_conn() as conn:
@@ -534,7 +534,7 @@ class DetectionDb:
 
     def insert_frame_with_detections(
         self,
-        camera_id: str,
+        camera_id: str = 0,
         image_path: str,
         detections: list[dict]
     ) -> int:
@@ -573,14 +573,43 @@ class DetectionDb:
     def get_detection_by_id(self, det_id: int):
         return self.pg.get_detection_by_id(det_id)
 
-    def get_recent_frames(self, limit=20):
-        return self.pg.get_recent_frames(limit)
-
     def get_frame_by_id(self, frame_id: int):
         return self.pg.get_frame_by_id(frame_id)
 
-    def get_detection_by_class(self, class_name: str, limit=50):
-        return self.pg.get_detection_by_class(class_name, limit=limit)
+    def get_detections(
+        self,
+        *,
+        frame_id: int = None,
+        class_name: str = None,
+        min_confidence: float = None,
+        # attributes: json = None,
+        limit: int = None,
+        offset: int = None
+    ):
+        return self.pg.get_detections(
+            frame_id = frame_id,
+            class_name = class_name,
+            min_confidence = min_confidence,
+            limit = limit,
+            offset = offset
+        )
+
+    def get_frames(
+        self,
+        *,
+        camera_id: str = None,
+        model_name: str = None,
+        created_after: int = None,
+        limit: int = 20,
+        offset: int = 0
+    ) -> List[dict[str, Any]]:
+        return self.pg.get_frames(
+            camera_id = camera_id,
+            model_name = model_name,
+            created_after = created_after,
+            limit = limit,
+            offset = offset
+        )
 
     def _sync_unsynced(self):
         """Background thread to push unsynced cache rows to Postgres."""

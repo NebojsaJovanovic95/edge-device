@@ -76,12 +76,13 @@ async def detect(
         result = pickle.loads(result_raw)
         detection_data = result["detection"]
 
-    
     detection_data: json = results[0].tojson()
+    detections = [detection for detection in json.loads(detection_data)]
 
     detection_id = db.insert_frame_with_detections(
-        str(image_path),
-        json.loads(detection_data)
+        camera_id = 0,
+        image_path = str(image_path),
+        detections=detections
     )
 
     logger.info(f"[{NAME}]: Saved detection {detection_id}.")
@@ -99,7 +100,7 @@ async def detect(
 @app.get("/detections")
 async def get_all_detections() -> JSONResponse:
     return JSONResponse(
-        {"detections": db.get_recent_frames(limit=20)}
+        {"detections": db.get_frames(limit=20)}
     )
 
 @app.get("/detection/{id}")
