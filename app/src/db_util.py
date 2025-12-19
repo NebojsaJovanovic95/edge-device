@@ -547,6 +547,7 @@ class DetectionDb:
         """
         ts = int(time.time())
         detections = [self._normalize_detection(d) for d in raw_detections]
+        logger.info(f"[INSERT]: {detections}")
         try:
             frame_id = self.pg.insert_frame(
                 camera_id=camera_id,

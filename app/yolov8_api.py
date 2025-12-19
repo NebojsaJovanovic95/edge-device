@@ -106,7 +106,7 @@ async def get_all_detections() -> JSONResponse:
 @app.get("/detection/{id}")
 async def get_detection(id: int):
     frame_with_detections = db.get_frame_by_id(id)
-    if frame_with_detections is None:
+    if frame_with_detections["frame"] is None:
         raise HTTPException(
             status_code=404,
             detail="Detection not found"
