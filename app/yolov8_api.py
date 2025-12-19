@@ -76,12 +76,13 @@ async def detect(
         result = pickle.loads(result_raw)
         detection_data = result["detection"]
 
-    
     detection_data: json = results[0].tojson()
 
-    detection_id = db.insert_detection(
-        str(image_path),
-        json.loads(detection_data)
+    detection_id = db.insert_frame_with_detections(
+        camera_id = 0,
+        image_path = str(image_path),
+        raw_detections = detection_data,
+        model_name = settings.MODEL_NAME
     )
 
     logger.info(f"[{NAME}]: Saved detection {detection_id}.")
@@ -99,21 +100,21 @@ async def detect(
 @app.get("/detections")
 async def get_all_detections() -> JSONResponse:
     return JSONResponse(
-        {"detections": db.get_recent(limit=20)}
+        {"detections": db.get_frames(limit=20)}
     )
 
 @app.get("/detection/{id}")
 async def get_detection(id: int):
-    detection = db.get_detection_by_id(id)
-    if detection is None:
+    frame_with_detections = db.get_frame_by_id(id)
+    if frame_with_detections["frame"] is None:
         raise HTTPException(
             status_code=404,
             detail="Detection not found"
         )
-    logger.info(f"[{NAME}]: Fetched detection: s{detection}")
+    logger.info(f"[{NAME}]: Fetched detection: s{frame_with_detections}")
     
-    image_path: str = detection["image_path"]
-    detection_data: list[dict[str, Any]] = json.loads(detection["detection_data"])
+    image_path: str = frame_with_detections["frame"]["image_path"]
+    detection_data: list[dict[str, Any]] = frame_with_detections["detections"]
 
     def image_stream() -> Any:
         with minio_storage.load_image(image_path) as image_file:

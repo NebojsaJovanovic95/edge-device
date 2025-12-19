@@ -10,6 +10,8 @@ from psycopg2.extras import RealDictCursor, Json
 from src.config import settings
 from psycopg2 import OperationalError
 
+MAX_ROW_LIMIT = 1000
+
 class BaseDb:
     """Base class storing common SQL strings and helper logic."""
 
@@ -56,70 +58,52 @@ class BaseDb:
 
 
 class SqliteDb(BaseDb):
-    SQLITE_TABLE_NAME = "cache_detections"
+    """Two-table SQLite cache mirroring Postgres: frame + detection."""
 
-    SQL_CREATE_TABLE = f"""
-        CREATE TABLE IF NOT EXISTS {SQLITE_TABLE_NAME} (
-            {BaseDb.COL_ID} INTEGER PRIMARY KEY AUTOINCREMENT,
-            {BaseDb.COL_IMAGE_PATH} TEXT NOT NULL,
-            {BaseDb.COL_DETECTION_DATA} TEXT NOT NULL,
-            {BaseDb.COL_CREATED_AT} REAL NOT NULL,
-            {BaseDb.COL_SYNCED} INTEGER DEFAULT 0
-        )
+    SQL_CREATE_FRAME = """
+    CREATE TABLE IF NOT EXISTS frame (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        image_path TEXT NOT NULL,
+        camera_id TEXT,
+        model_name TEXT,
+        created_at INTEGER NOT NULL,
+        synced INTEGER NOT NULL DEFAULT 0
+    );
     """
 
-    SQL_SELECT_UNSYNCED = f"""
-        SELECT * FROM {SQLITE_TABLE_NAME} WHERE {BaseDb.COL_SYNCED}=0
-        ORDER BY {BaseDb.COL_CREATED_AT} ASC
+    SQL_CREATE_DETECTION = """
+    CREATE TABLE IF NOT EXISTS detection (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        frame_id INTEGER NOT NULL REFERENCES frame(id) ON DELETE CASCADE,
+        class_name TEXT NOT NULL,
+        confidence REAL NOT NULL,
+        bbox TEXT NOT NULL,      -- store as JSON string
+        attributes TEXT,         -- optional JSON metadata
+        created_at INTEGER NOT NULL
+    );
     """
 
-    SQL_UPDATE_SYNCED = f"""
-        UPDATE {SQLITE_TABLE_NAME} SET {BaseDb.COL_ID}=?, {BaseDb.COL_SYNCED}=1
-        WHERE rowid=?
-    """
+    SQL_INDEXES = [
+        "CREATE INDEX IF NOT EXISTS idx_frame_created_at ON frame(created_at DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_detection_class ON detection(class_name);",
+        "CREATE INDEX IF NOT EXISTS idx_detection_frame ON detection(frame_id);",
+    ]
 
-    SQL_INSERT = f"""
-        INSERT INTO {SQLITE_TABLE_NAME} (
-            {BaseDb.COL_IMAGE_PATH},
-            {BaseDb.COL_DETECTION_DATA},
-            {BaseDb.COL_CREATED_AT},
-            {BaseDb.COL_SYNCED}
-        )
-        VALUES (?, ?, ?, 0)
-    """
-
-    SQL_INSERT_WITH_ID = f"""
-        INSERT INTO {SQLITE_TABLE_NAME} (
-            {BaseDb.COL_ID},
-            {BaseDb.COL_IMAGE_PATH},
-            {BaseDb.COL_DETECTION_DATA},
-            {BaseDb.COL_CREATED_AT},
-            {BaseDb.COL_SYNCED}
-        )
-        VALUES (?, ?, ?, ?, 1)
-    """
-
-    SQL_SELECT_BY_ID = f"""
-        SELECT *
-        FROM {SQLITE_TABLE_NAME}
-        WHERE {BaseDb.COL_ID}=?
-    """
-
-    SQL_SELECT_RECENT = f"""
-        SELECT *
-        FROM {SQLITE_TABLE_NAME}
-        ORDER BY {BaseDb.COL_CREATED_AT} DESC
-        LIMIT ?
-    """
-
-    SQL_PRUNE = f"""
-        DELETE FROM {SQLITE_TABLE_NAME}
-        WHERE {BaseDb.COL_ID} NOT IN (
-            SELECT {BaseDb.COL_ID}
-            FROM {SQLITE_TABLE_NAME}
-            ORDER BY {BaseDb.COL_CREATED_AT} DESC
+    SQL_PRUNE = """
+        DELETE FROM frame
+        WHERE id NOT IN (
+            SELECT id FROM frame
+            ORDER BY created_at DESC
             LIMIT ?
-        )
+        );
+    """
+
+    SQL_SELECT_UNSYNCED = """
+        SELECT f.*, d.*
+        FROM frame f
+        JOIN detection d ON d.frame_id = f.id
+        WHERE f.synced = 0
+        ORDER BY f.created_at, d.id;
     """
 
     def __init__(
@@ -134,42 +118,105 @@ class SqliteDb(BaseDb):
 
     def _init_db(self):
         with self._get_conn() as conn:
-            conn.execute(self.SQL_CREATE_TABLE)
+            conn.execute(self.SQL_CREATE_FRAME)
+            conn.execute(self.SQL_CREATE_DETECTION)
+            for idx in self.SQL_INDEXES:
+                conn.execute(idx)
             conn.commit()
+        logger.info("SQLite: Cache schema initialized.")
 
-    def insert_detection(
+    def insert_frame(
         self,
         image_path: str,
-        detection_data: dict[str, Any],
-        ts: Optional[int] = None,
-        id_override: Optional[int] = None
+        camera_id: str = None,
+        model_name: str = None,
+        ts: Optional[int] = None
     ) -> int:
         ts = ts or int(time.time())
         with self._get_conn() as conn:
-            cursor = conn.cursor()
-            if id_override:
-                cursor.execute(
-                    self.SQL_INSERT_WITH_ID,
-                    (
-                        id_override,
-                        image_path,
-                        json.dumps(detection_data),
-                        ts
-                    )
+            cursor.conn.execute(
+                """
+                INSERT INTO frame (
+                    image_path,
+                    camera_id,
+                    model_name,
+                    created_at
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (
+                    image_path,
+                    camera_id,
+                    model_name,
+                    ts
                 )
-                conn.commit()
-                return id_override
-            else:
-                cursor.execute(
-                    self.SQL_INSERT,
-                    (
-                        image_path,
-                        json.dumps(detection_data),
-                        ts
-                    )
-                )
+            )
             conn.commit()
             return cursor.lastrowid
+
+    def get_recent_frames(self, limit: int = 20) -> List[dict]:
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM frame ORDER BY created_at DESC LIMIT ?",
+                (limit,)
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def insert_detection(
+        self,
+        frame_id: int,
+        class_name: str,
+        confidence: float,
+        bbox: dict,
+        attrs: dict = None,
+        ts: Optional[int] = None
+    ) -> int:
+        ts = ts or int(time.time())
+        with self._get_conn() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO detection (
+                    frame_id,
+                    class_name,
+                    confidence,
+                    bbox,
+                    attributes,
+                    created_at,
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    frame_id,
+                    class_name,
+                    confidence,
+                    json.dumps(bbox),
+                    json.dumps(attrs or {}),
+                    ts
+                )
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_detection_for_frame(self, frame_id: int) -> List[dict]:
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM detection WHERE frame_id=? ORDER BY id ASC",
+                (frame_id,)
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_detection_by_class(
+        self,
+        class_name: str,
+        limit: int = 50
+    ) -> List[dict]:
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM detection WHERE class_name=? ORDER BY created_at DESC LIMIT ?",
+                (class_name, limit)
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
     def get_detection_by_id(
         self,
@@ -206,7 +253,7 @@ class SqliteDb(BaseDb):
                 (limit,)
             )
             return [dict(row) for row in cursor.fetchall()]
-    
+
     def prune_cache(
         self,
         max_rows: int = 100
@@ -218,23 +265,40 @@ class SqliteDb(BaseDb):
                 (max_rows,)
             )
             conn.commit()
-        
+
 
 class PostgresDb(BaseDb):
     """POstgres main DB."""
-    SQL_CREATE_TABLE = """
-    CREATE TABLE IF NOT EXISTS {table} (
-        {id_col} SERIAL PRIMARY KEY,
-        {image_col} TEXT NOT NULL,
-        {data_col} JSONB NOT NULL,
-        {ts_col} BIGINT NOT NULL
-    )
+    SQL_CREATE_FRAME = """
+    CREATE TABLE IF NOT EXISTS frame (
+        id SERIAL PRIMARY KEY,
+        image_path TEXT NOT NULL,
+        camera_id TEXT,
+        model_name TEXT,
+        created_at BIGINT NOT NULL
+    );
     """
 
-    def __init__(self, conn_str: str, table_name: str):
+    SQL_CREATE_DETECTION = """
+    CREATE TABLE IF NOT EXISTS detection (
+        id SERIAL PRIMARY KEY,
+        frame_id INTEGER NOT NULL REFERENCES frame(id) ON DELETE CASCADE,
+        class_name TEXT NOT NULL,
+        confidence REAL NOT NULL,
+        bbox JSONB NOT NULL,      -- [x, y, w, h] or similar
+        attributes JSONB          -- optional additional metadata
+    );
+    """
+
+    SQL_INDEXES = [
+        "CREATE INDEX IF NOT EXISTS idx_frames_ts ON frame (created_at DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_frames_camera ON frame (camera_id);",
+        "CREATE INDEX IF NOT EXISTS idx_detections_class ON detection (class_name);",
+        "CREATE INDEX IF NOT EXISTS idx_detections_frame ON detection (frame_id);",
+    ]
+    def __init__(self, conn_str: str):
         self.conn_str = conn_str
-        self.table = table_name
-        self._init_table()
+        self._init_tables()
 
     def _get_conn(self):
         return psycopg2.connect(
@@ -242,45 +306,114 @@ class PostgresDb(BaseDb):
             cursor_factory=RealDictCursor
         )
     
-    def _init_table(self):
+    def _init_tables(self):
         # Format the stored SQL template with the actual table/column names
-        query = self.SQL_CREATE_TABLE.format(
-            table=self.table,
-            id_col=self.COL_ID,
-            image_col=self.COL_IMAGE_PATH,
-            data_col=self.COL_DETECTION_DATA,
-            ts_col=self.COL_CREATED_AT
-        )
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute(query)
+                cur.execute(self.SQL_CREATE_FRAME)
+                cur.execute(self.SQL_CREATE_DETECTION)
+                for idx in self.SQL_INDEXES:
+                    cur.execute(idx)
                 conn.commit()
+        logger.info("Postgres: normalized schema initialized.")
 
-    def insert_detection(
+    def insert_frame(
         self,
         image_path: str,
-        detection_data: dict,
-        ts: Optional[int] = None
+        camera_id: int,
+        model_name: str,
+        ts: int
     ) -> int:
-        ts = ts or int(time.time())
-        query = self._format_query(
-            self.SQL_INSERT,
-            self.table
-        )
-        logger.info(f"Query: {query} \ndata: ({image_path}, detection type: ({type(detection_data)}), {ts})")
+        query = """
+        INSERT INTO frame (
+            image_path,
+            camera_id,
+            model_name,
+            created_at
+        ) VALUES (%s, %s, %s, %s)
+        RETURNING id;
+        """
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     query,
                     (
                         image_path,
-                        psycopg2.extras.Json(detection_data),
+                        camera_id,
+                        model_name,
                         ts
                     )
                 )
-                inserted_id = cur.fetchone()[self.COL_ID]
+                frame_id = cur.fetchone()["id"]
                 conn.commit()
-                return inserted_id
+                return frame_id
+
+    def insert_detection(
+        self,
+        frame_id: int,
+        class_name: str,
+        confidence: float,
+        bbox: dict,
+        attrs=None
+    ) -> int:
+        query = """
+        INSERT INTO detection (
+            frame_id,
+            class_name,
+            confidence,
+            bbox,
+            attributes
+        ) VALUES (%s, %s, %s, %s, %s);
+        """
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    query,
+                    (
+                        frame_id,
+                        class_name,
+                        confidence,
+                        Json(bbox),
+                        Json(attrs or {})
+                    )
+                )
+                conn.commit()
+
+    def get_frame_by_id(
+        self,
+        frame_id: int
+    ) -> Optional[dict]:
+        """
+        Fetch frame with frame_id and get all detections with frame_id = frame_id
+        {
+            "frame": {frame entry},
+            "detections": [
+                ... {detection where frame_id = frame_id}
+            ]
+        """
+        result = {
+            "frame": None,
+            "detections": []
+        }
+        query_frame = "SELECT * FROM frame WHERE id=%s"
+        query_detections = "SELECT * FROM detection WHERE frame_id=%s"
+        with self._get_conn() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    query_frame,
+                    (frame_id,)
+                )
+                frame = cur.fetchone()
+                if not frame:
+                    return result
+                result["frame"] = dict(frame)
+                cur.execute(
+                    query_detections,
+                    (frame_id,)
+                )
+                detections = cur.fetchall()
+                result["detections"] = [dict(d) for d in detections]
+        return result
 
     def get_detection_by_id(
         self,
@@ -290,42 +423,100 @@ class PostgresDb(BaseDb):
             self.SQL_SELECT_BY_ID,
             self.table
         )
+        qyery = "SELECT * FROM detection WHERE id=%s"
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(query, (detection_id,))
-                row = cur.fetchone()
-                if row:
-                    return {
-                        self.COL_ID: row[0],
-                        self.COL_IMAGE_PATH: row[1],
-                        self.COL_DETECTION_DATA: json.loads(
-                            row[2]
-                        ),
-                        self.COL_CREATED_AT: row[3]
-                    }
-                return None
+                return cur.fetchone()
 
-    def get_recent(self, limit: int = 100) -> List[dict[str, Any]]:
-        query = self._format_query(
-            self.SQL_SELECT_RECENT,
-            self.table
-        )
+    def get_frames(
+        self,
+        *,
+        camera_id: str = None,
+        model_name: str = None,
+        created_after: int = None,
+        limit: int = 20,
+        offset: int = 0
+    ) -> List[dict[str, Any]]:
+        query = "SELECT * FROM frame"
+        conditions = []
+        params = {}
+
+        if camera_id:
+            conditions.append("camera_id = %(camera_id)s")
+            params["camera_id"] = camera_id
+
+        if model_name:
+            conditions.append("model_name = %(model_name)s")
+            params["model_name"] = model_name
+
+        if created_after:
+            conditions.append("created_at > %(created_after)s")
+            params["created_after"] = created_after
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY id DESC"
+
+        if limit is not None:
+            query += " LIMIT %(limit)s"
+            params["limit"] = min(limit, MAX_ROW_LIMIT)
+
+        if offset is not None:
+            query += " OFFSET %(offset)s"
+            params["offset"] = offset
+
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute(query, (limit,))
-                rows = cur.fetchall()
-                return [
-                    {
-                        self.COL_ID: row[0],
-                        self.COL_IMAGE_PATH: row[1],
-                        self.COL_DETECTION_DATA: json.loads(
-                            row[2]
-                        ),
-                        self.COL_CREATED_AT: row[3]
-                    }
-                    for row in rows
-                ]
-            
+                cur.execute(query, params)
+                return cur.fetchall()
+
+    def get_detections(
+        self,
+        *,
+        frame_id: int = None,
+        class_name: str = None,
+        min_confidence: float = None,
+        # attributes: json = None,
+        limit: int = None,
+        offset: int = None
+    ):
+        query = "SELECT * FROM detection"
+        conditions = []
+        params = {}
+
+        if frame_id:
+            conditions.append("frame_id = %(frame_id)s")
+            params["frame_id"] = frame_id
+
+        if class_name:
+            conditions.append("class_name = %(class_name)s")
+            params["class_name"] = class_name
+
+        if min_confidence:
+            conditions.append("confidence > %(min_confidence)s")
+            params["min_confidence"] = min_confidence
+
+        # if attributes:
+        #    conditions.append("attributes = %(attributes)s")
+        #    params["attributes"] = attributes
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY id DESC"
+
+        if limit is not None:
+            query += " LIMIT %(limit)s"
+            params["limit"] = min(limit, MAX_ROW_LIMIT)
+        if offset is not None:
+            query += " OFFSET %(offset)s"
+            params["offset"] = offset
+
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                return cur.fetchall()
+
 
 class DetectionDb:
     """High-level interface combining Postgres + SQLite cache with offline handling."""
@@ -336,62 +527,102 @@ class DetectionDb:
         sqlite_path: str
     ):
         self.cache = SqliteDb(sqlite_path)
-        self.main_db = PostgresDb(
+        self.pg = PostgresDb(
             postgres_dsn,
-            table_name=settings.POSTGRES_TABLE_NAME
         )
         self.cache.prune_cache(max_rows=100)
         self._start_sync_thread()
 
-    def insert_detection(
+    def insert_frame_with_detections(
         self,
+        camera_id: str,
         image_path: str,
-        detection_data: dict[str, Any]
+        raw_detections: json,
+        model_name: str,
     ) -> int:
-        """Insert into both cache and main DB."""
-        ts: datetime = int(time.time())
-        local_id = self.cache.insert_detection(
-            image_path,
-            detection_data,
-            ts
-        )
+        """
+        High level insert:
+        - insert frame
+        - insert each detection
+        - Cache raw record for offline model_name
+        """
+        ts = int(time.time())
+        detections = [self._normalize_detection(d) for d in raw_detections]
+        logger.info(f"[INSERT]: {detections}")
         try:
-            pg_id = self.main_db.insert_detection(
+            frame_id = self.pg.insert_frame(
+                camera_id=camera_id,
+                image_path=image_path,
+                model_name=model_name,
+                ts=ts
+            )
+            for det in detections:
+                self.pg.insert_detection(
+                    frame_id=frame_id,
+                    class_name=det["class_name"],
+                    confidence=det["confidence"],
+                    bbox=det["bbox"],
+                )
+        except Exception as e:
+            logger.eror(f"Postgres insert failed, falling back to cache: {e}")
+            self.cache.insert_detection(
                 image_path,
-                detection_data,
+                detections,
                 ts
             )
-            self.cache.mark_synced(
-                local_id,
-                pg_id
-            )
-            return pg_id
-        except Exception as e:
-            logger.warning(
-                f"Postgres insert failed: {e}, keeping local cache ID {local_id}"
-            )
-            return local_id
+            return -1
 
-    def get_detection_by_id(
+        return frame_id
+
+    def get_detection_by_id(self, det_id: int):
+        return self.pg.get_detection_by_id(det_id)
+
+    def get_frame_by_id(self, frame_id: int):
+        return self.pg.get_frame_by_id(frame_id)
+
+    def get_detections(
         self,
-        detection_id: int
-    ) -> Optional[dict[str, Any]]:
-        """Try cache first, then main DB."""
-        cached = self.cache.get_detection_by_id(detection_id)
-        if cached:
-            return cached
-        record = self.main_db.get_detection_by_id(detection_id)
-        if record:
-            self.cache.insert_detection(
-                record[BaseDb.COL_IMAGE_PATH],
-                record[BaseDb.COL_DETECTION_DATA],
-                record[BaseDb.COL_CREATED_AT],
-            )
-        return record
+        *,
+        frame_id: int = None,
+        class_name: str = None,
+        min_confidence: float = None,
+        # attributes: json = None,
+        limit: int = None,
+        offset: int = None
+    ):
+        return self.pg.get_detections(
+            frame_id = frame_id,
+            class_name = class_name,
+            min_confidence = min_confidence,
+            limit = limit,
+            offset = offset
+        )
 
-    def get_recent(self, limit: int = 10) -> List[dict]:
-        return self.cache.get_recent(limit)
-    
+    def get_frames(
+        self,
+        *,
+        camera_id: str = None,
+        model_name: str = None,
+        created_after: int = None,
+        limit: int = 20,
+        offset: int = 0
+    ) -> List[dict[str, Any]]:
+        return self.pg.get_frames(
+            camera_id = camera_id,
+            model_name = model_name,
+            created_after = created_after,
+            limit = limit,
+            offset = offset
+        )
+
+    def _normalize_detection(self, det: dict) -> dict:
+        return {
+            "class_name": det.get("class") or det.get("name"),
+            "confidence": float(det["confidence"]),
+            "bbox": det.get("bbox") or det.get("box"),
+            "attributes": det.get("attributes", {})
+        }
+
     def _sync_unsynced(self):
         """Background thread to push unsynced cache rows to Postgres."""
         delay = 5
@@ -400,11 +631,23 @@ class DetectionDb:
             synced_any = False
             for row in unsynced:
                 try:
-                    pg_id = self.main_db.insert_detection(
-                        image_path=row[BaseDb.COL_IMAGE_PATH],
-                        detection_data=json.loads(row[BaseDb.COL_DETECTION_DATA]),
+                    frame_id = self.pg.insert_frame(
+                        camera_id=row.get(
+                            "camera_id",
+                            "unknown"
+                        ),
+                        image_path=row["image_path"],
                         ts=row[BaseDb.COL_CREATED_AT]
                     )
+                    for det in json.loads(row[BaseDb.COL_DETECTION_DATA]):
+                        self.pg.insert_detection(
+                            frame_id=frame_id,
+                            class_name=det["class"],
+                            confidence=det["confidence"],
+                            bbox=det["bbox"],
+                            ts=row[BaseDb.COL_CREATED_AT]
+                        )
+
                     self.cache.mark_synced(row['id'], pg_id)
                     logger.info(
                         f"Synced local row {row['id']} -> Postgres ID {pg_id}"
@@ -417,6 +660,7 @@ class DetectionDb:
                     )
                     delay = min(delay * 2, 300)
                     break
+
             if synced_any:
                 try:
                     self.cache.prune_cache(max_rows=100)
@@ -427,6 +671,7 @@ class DetectionDb:
                     logger.warning(
                         f"Cache pruning failed: {e}"
                     )
+
             time.sleep(delay)
     
     def _start_sync_thread(self):
