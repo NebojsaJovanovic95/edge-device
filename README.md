@@ -151,3 +151,67 @@ flowchart TB
 13 directories, 34 files
 ```
 
+<<<<<<< HEAD
+=======
+# Future Architecture
+```mermaid
+flowchart TB
+    subgraph Streaming_Apps[streaming app replicas]
+        cameras["one instance per camera"]
+    end
+
+    subgraph Redis
+        direction TB
+        STREAM[streaming requests]
+        MODEL_REQUESTS[model requests]
+        MODEL_RESULTS[model results]
+        STORAGE_BUFFER[storage buffering]
+    end
+
+    subgraph YOLOv8_Server["Yolov8 Server (replicas)"]
+        FAST_API["request routing instance"]
+        %% DetectionDB bellow FAST_API
+        direction TB
+        subgraph DetectionDB
+            CACHE[sqllite for caching]
+            PG_CLIENT[postgres connection]
+        end
+    end
+
+    subgraph YOLOv8_MODEL
+        GPU[yolo model runs on gpu with cuda]
+    end
+
+
+    subgraph Postgres
+        PG[postgres]
+    end
+
+    subgraph MinIO [Minio Object Storage]
+        M[minio]
+    end
+
+    Streaming_Apps --> STREAM
+    STREAM --> FAST_API
+    FAST_API <--> MODEL_REQUESTS
+    FAST_API <--> DetectionDB
+    MODEL_REQUESTS --> GPU
+    GPU --> MODEL_RESULTS
+    MODEL_RESULTS --> FAST_API
+    DetectionDB <--> STORAGE_BUFFER
+    STORAGE_BUFFER <--> PG
+    STORAGE_BUFFER <--> M
+```
+
+# Camera connection
+```
+ffplay -rtsp_transport tcp "rtsp://192.168.1.10:554/user=admin&password=&channel=1&stream=0.sdp"
+```
+## temp ip setup
+```
+sudo ip addr add 192.168.1.100/24 dev wlan0
+```
+<<<<<<< HEAD
+>>>>>>> 86dc98a (Camera settings reminder added)
+=======
+>>>>>>> 86dc98a (Camera settings reminder added)
