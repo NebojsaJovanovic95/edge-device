@@ -405,7 +405,8 @@ class PostgresDb(BaseDb):
                 )
                 frame = cur.fetchone()
                 if not frame:
-                    return None
+                    return result
+                result["frame"] = dict(frame)
                 cur.execute(
                     query_detections,
                     (frame_id,)
