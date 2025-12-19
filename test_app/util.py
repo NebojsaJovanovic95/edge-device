@@ -15,10 +15,10 @@ def draw_detection(
     img = cv2.imread(image_path)
 
     for det in detections:
-        box = det["box"]
+        box = det["bbox"]
         x1, y1 = int(box["x1"]), int(box["y1"])
         x2, y2 = int(box["x2"]), int(box["y2"])
-        label = f"{det['name']} {det['confidence']:.2f}"
+        label = f"{det['class_name']} {det['confidence']:.2f}"
 
         # Draw rectangle
         cv2.rectangle(

@@ -26,5 +26,5 @@ def run_test(id: int = TEST_ID):
         for chunk in response.iter_content(1024):
             f.write(chunk)
 
-    # 3️⃣ Draw detections using your existing utility
+    # Draw detection
     draw_detection(image_path, detections, output_path)
