@@ -1,5 +1,5 @@
 from __future__ import annotations
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 
 import uvicorn, asyncio, tempfile, os, json
@@ -98,13 +98,77 @@ async def detect(
     )
 
 @app.get("/detections")
-async def get_all_detections() -> JSONResponse:
+async def get_all_detections(
+    frame_id: Optional[int] = Query(None),
+    class_name: Optional[str] = Query(None),
+    confidence: Optional[float] = Query(None, ge = 0.0, le = 1.0),
+    limit: int = Query(20, ge = 1, le = 100),
+    offset: int = Query(0, ge = 0)
+) -> JSONResponse:
+    detections = db.get_detections(
+        frame_id=frame_id,
+        class_name=class_name,
+        confidence=confidence,
+        limit=limit,
+        offset=offset
+    )
     return JSONResponse(
-        {"detections": db.get_frames(limit=20)}
+        {
+            "count": len(detections),
+            "detections": detections
+        }
+    )
+
+@app.get("/frames")
+async def get_all_frames(
+    camera_id: Optional[int] = Query(None),
+    model_name: Optional[str] = Query(None),
+    after_ts: Optional[int] = Query(None),
+    limit: int = Query(20, ge = 1, le=100),
+    offset: int = Query(0, ge = 0)
+) -> JSONResponse:
+    frames = db.get_frames(
+        camera_id=camera_id,
+        model_name=model_name,
+        created_after=after_ts,
+        limit=limit,
+        offset=offset
+    )
+    return JSONResponse(
+        {
+            "count": len(frames),
+            "frames": frames
+        }
     )
 
 @app.get("/detection/{id}")
 async def get_detection(id: int):
+    detection = db.get_detection(id)
+    if detection is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Detection not found"
+        )
+    logger.info(f"[{NAME}]: Fetched detection: s{detection}")
+    
+    frame = db.get_frame_by_id(frame_id=detection["frame_id"])
+    image_path: str = frame["image_path"]
+
+    def image_stream() -> Any:
+        with minio_storage.load_image(image_path) as image_file:
+            while chunk := image_file.read(1024):
+                yield chunk
+    
+    return StreamingResponse(
+        image_stream(),
+        media_type="image/jpeg",
+        headers={
+            "X-Detection-Data": json.dumps(detection)
+        }
+    )
+
+@app.get("/frame/{id}")
+async def get_frame(id: int):
     frame_with_detections = db.get_frame_by_id(id)
     if frame_with_detections["frame"] is None:
         raise HTTPException(
@@ -126,7 +190,8 @@ async def get_detection(id: int):
         media_type="image/jpeg",
         headers={
             "X-Detection-Data": json.dumps(detection_data)
-        })
+        }
+    )
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)
