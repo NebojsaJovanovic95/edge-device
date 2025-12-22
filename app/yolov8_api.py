@@ -102,8 +102,8 @@ async def get_all_detections(
     frame_id: Optional[int] = Query(None),
     class_name: Optional[str] = Query(None),
     confidence: Optional[float] = Query(None, ge = 0.0, le = 1.0),
-    limit: Optional[int] = Query(20, ge = 1, le = 100),
-    offset: Optional[int] = Query(0, ge = 0)
+    limit: int = Query(20, ge = 1, le = 100),
+    offset: int = Query(0, ge = 0)
 ) -> JSONResponse:
     detections = db.get_detections(
         frame_id=frame_id,
@@ -124,13 +124,13 @@ async def get_all_frames(
     camera_id: Optional[int] = Query(None),
     model_name: Optional[str] = Query(None),
     after_ts: Optional[int] = Query(None),
-    limit: Optional[int] = Query(20, ge = 1, le=100),
-    offset: Optional[int] = Query(0, ge = 0)
+    limit: int = Query(20, ge = 1, le=100),
+    offset: int = Query(0, ge = 0)
 ) -> JSONResponse:
     frames = db.get_frames(
         camera_id=camera_id,
         model_name=model_name,
-        after_ts=after_ts,
+        created_after=after_ts,
         limit=limit,
         offset=offset
     )
