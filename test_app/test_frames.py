@@ -4,7 +4,12 @@ SERVER_URL = "http://yolov8_server:5000"
 TEST_IMAGE = "test.jpg"
 
 def run_test():
-    response = requests.get(f"{SERVER_URL}/frames")
+    response = requests.get(
+        f"{SERVER_URL}/frames",
+        {
+            "limit": 20
+        }
+    )
     
     print("Status code:", response.status_code)
     print("Response:", response.json())
