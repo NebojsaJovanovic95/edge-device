@@ -215,3 +215,5 @@ sudo ip addr add 192.168.1.100/24 dev wlan0
 >>>>>>> 86dc98a (Camera settings reminder added)
 =======
 >>>>>>> 86dc98a (Camera settings reminder added)
+# Kubernetes
+Working on Kubernetes to maintain and scale my containers
