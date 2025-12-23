@@ -18,8 +18,10 @@ spec:
         env:
           - name: POSTGRES_PASSWORD
             value: "secret" # USE SECRET IN PRODUCTION
-          - name: POSTGRESS_DB
+          - name: POSTGRES_DB
             value: observer
+          - name: POSTGRES_USER
+            value: myuser
         ports:
         - containerPort: 5432
         volumeMounts:

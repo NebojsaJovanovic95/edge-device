@@ -1,4 +1,4 @@
-apiVersion: apiVersion
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
@@ -19,7 +19,7 @@ spec:
           - containerPort: 6379
 ---
 apiVersion: v1
-kidn: Service
+kind: Service
 metadata:
   name: redis
 spec:
@@ -28,3 +28,4 @@ spec:
   ports:
     - port: 6379
       targetPort: 6379
+      protocol: TCP
