@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: SErvice
+metadata:
+  name: yolov8_server
+spec:
+  selector:
+    app: yolov8_server
+  ports:
+  - port: 5000
+    targetPort: 5000

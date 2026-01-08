@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  nameL: yolov8_model
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: yolov8_model
+  template:
+    metadata:
+      labels:
+        app: yolov8_model
+    spec:
+      continers:
+      - name: yolov8_model
+        image: yolov8_model:latest
+        volumeMounts:
+        - name: models
+          mountPath: /app/model
+      volumes:
+      - name: models
+        persistantVolumeClaim:
+          claimName: models-pvc

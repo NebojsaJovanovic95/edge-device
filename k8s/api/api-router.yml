@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yolov8_server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: yolov8_server
+  spec:
+    containers:
+    - name: api
+      image: yolov8_server:latest
+      ports:
+      - containerPort: 5000
+      env:
+      - name: REDIS_HOST
+        value: redis
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 5000

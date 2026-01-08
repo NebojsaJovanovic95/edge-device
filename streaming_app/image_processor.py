@@ -1,4 +1,4 @@
-import os, time, cv2
+import os, time, cv2, redis, signal, sys
 import logging
 import aiohttp
 import socket
@@ -32,6 +32,33 @@ FALLBACK_CAMERA_SOURCE: str = os.getenv(
 FRAME_INTERVAL: int = int(os.getenv("FRAME_INTERVAL", 5))
 HASH_DIFF_THRESHOLD = 1000
 SEND_INTERVAL = 1.0
+
+def claim_camera():
+    redis_host = os.getenv("REDIS_HOST", "redis")
+    redis_port = int(os.getenv("REDIS_PORT", "6379"))
+    queue = os.getenv("CAMERA_QUEUE", "cameras:pending")
+
+    r = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
+
+    logger.info("Waiting for camera assignment...")
+    camera_id = r.blpop(queue)[1]  # BLOCKS
+
+    rtsp_url = r.hget(f"camera:{camera_id}", "rtsp_url")
+    if not rtsp_url:
+        raise RuntimeError(f"No RTSP URL for camera {camera_id}")
+
+    logger.info(f"Claimed camera {camera_id}")
+
+    return r, camera_id, rtsp_url
+
+def register_shutdown_handler(r, camera_id):
+    def shutdown(sig, frame):
+        logger.warning(f"Releasing camera {camera_id}")
+        r.lpush("cameras:pending", camera_id)
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, shutdown)
+    signal.signal(signal.SIGINT, shutdown)
 
 def frame_hash(frame: np.ndarray) -> int:
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -218,11 +245,25 @@ async def process_video(session):
         await asyncio.sleep(0.01)
 
 async def main():
-    logger.info(f"{__name__} i am up...")
+    global RTSP_CAMERA_SOURCE
+
+    logger.info("Streaming app starting up")
+
+    # 🔹 STARTUP CODE (THIS IS THE ANSWER)
+    r, camera_id, rtsp_url = claim_camera()
+    register_shutdown_handler(r, camera_id)
+
+    RTSP_CAMERA_SOURCE = rtsp_url
+    logger.info(f"Assigned RTSP source: {RTSP_CAMERA_SOURCE}")
+
+    # 🔹 NORMAL APP LOGIC (unchanged)
     async with aiohttp.ClientSession() as session:
         while True:
-            await process_video(session)
-            await asyncio.sleep(5)
+            try:
+                await process_video(session)
+            except Exception as e:
+                logger.error(f"Stream error: {e}")
+                await asyncio.sleep(2)
 
 if __name__ == '__main__':
     asyncio.run(main())

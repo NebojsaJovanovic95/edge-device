@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streaming-app
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: streaming-app
+  template:
+    metadata:
+      labels:
+        app: streaming-app
+    spec:
+      containers:
+      - name: streaming
+        image: streaming-app:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: REDIS_HOST
+          value: redis
+        - name: REDIS_PORT
+          value: "6379"
+        - name: CAMERA_QUEUE
+          value: cameras:pending
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+          limits:
+            cpu: "1"
+            memory: "1Gi"
+        livenessProbe:
+          exec:
+            command:
+            - python3
+            - c
+            - "exit(0)"
+        readinessProbe:
+          exec:
+            command:
+            - python3
+            - c
+            - "exit(0)"
