@@ -216,4 +216,10 @@ sudo ip addr add 192.168.1.100/24 dev wlan0
 =======
 >>>>>>> 86dc98a (Camera settings reminder added)
 # Kubernetes
-Working on Kubernetes to maintain and scale my containers
+Working on Kubernetes (loot at k3s) to maintain and scale my containers
+
+# Notes
+- Adding camera - api endpoint for new camera - run a hook that would interact with the infrastructure to add or edit a pod for streaming app
+- Consider thread per camera for streaming app instead of replicating containers/pods.
+- Define time to live (ttl) for your image storage
+- Apps should be built on top of this (making requests to api and doing math)
