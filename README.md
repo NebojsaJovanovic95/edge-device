@@ -151,8 +151,7 @@ flowchart TB
 13 directories, 34 files
 ```
 
-<<<<<<< HEAD
-=======
+
 # Future Architecture
 ```mermaid
 flowchart TB
@@ -211,10 +210,7 @@ ffplay -rtsp_transport tcp "rtsp://192.168.1.10:554/user=admin&password=&channel
 ```
 sudo ip addr add 192.168.1.100/24 dev wlan0
 ```
-<<<<<<< HEAD
->>>>>>> 86dc98a (Camera settings reminder added)
-=======
->>>>>>> 86dc98a (Camera settings reminder added)
+
 # Kubernetes
 Working on Kubernetes (loot at k3s) to maintain and scale my containers
 
