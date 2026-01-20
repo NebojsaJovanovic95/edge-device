@@ -33,12 +33,12 @@ spec:
         livenessProbe:
           exec:
             command:
-            - python3
-            - c
-            - "exit(0)"
+            - sh
+            - -c
+            - "exit 0"
         readinessProbe:
           exec:
             command:
-            - python3
-            - c
-            - "exit(0)"
+            - sh
+            - -c
+            - "exit 0"

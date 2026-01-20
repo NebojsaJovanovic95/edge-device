@@ -7,6 +7,10 @@ spec:
   selector:
     matchLabels:
       app: yolov8_server
+  template:
+    metadata:
+      labels:
+        app: yolov8_server
   spec:
     containers:
     - name: api
