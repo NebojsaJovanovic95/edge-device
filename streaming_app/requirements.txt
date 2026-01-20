@@ -4,3 +4,5 @@ aiohttp
 numpy
 bytes
 opencv-python
+redis>=5.0.0
+
