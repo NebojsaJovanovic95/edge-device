@@ -221,7 +221,7 @@ Working on Kubernetes (loot at k3s) to maintain and scale my containers
 - Apps should be built on top of this (making requests to api and doing math)
 
 ## Motivation
-## Quickstart
+## Quick Start
 ## Usage
 ## Contributing
 ## Motivation
