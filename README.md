@@ -219,3 +219,9 @@ Working on Kubernetes (loot at k3s) to maintain and scale my containers
 - Consider thread per camera for streaming app instead of replicating containers/pods.
 - Define time to live (ttl) for your image storage
 - Apps should be built on top of this (making requests to api and doing math)
+
+## Motivation
+## Quickstart
+## Usage
+## Contributing
+## Motivation

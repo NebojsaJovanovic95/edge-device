@@ -1,0 +1,233 @@
+# Save the output of this file and use kubectl create -f to import
+# it into Kubernetes.
+#
+# Created with podman-5.7.1
+
+# NOTE: The namespace sharing for a pod has been modified by the user and is not the same as the
+# default settings for kubernetes. This can lead to unexpected behavior when running the generated
+# kube yaml in a kubernetes cluster.
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    bind-mount-options: /home/nebojsa/Documents/edge-device/image:Z
+    io.kubernetes.cri-o.SandboxID/minio: 72eea2f4c82d0e3595dbc1196eeb8698232175033678f570d80289d197106354
+    io.kubernetes.cri-o.SandboxID/postgres: 72eea2f4c82d0e3595dbc1196eeb8698232175033678f570d80289d197106354
+    io.kubernetes.cri-o.SandboxID/redis: 72eea2f4c82d0e3595dbc1196eeb8698232175033678f570d80289d197106354
+    io.kubernetes.cri-o.SandboxID/streamingapp: 72eea2f4c82d0e3595dbc1196eeb8698232175033678f570d80289d197106354
+    io.kubernetes.cri-o.SandboxID/testapp: 72eea2f4c82d0e3595dbc1196eeb8698232175033678f570d80289d197106354
+    io.kubernetes.cri-o.SandboxID/yolov8model: 72eea2f4c82d0e3595dbc1196eeb8698232175033678f570d80289d197106354
+    io.kubernetes.cri-o.SandboxID/yolov8server: 72eea2f4c82d0e3595dbc1196eeb8698232175033678f570d80289d197106354
+  creationTimestamp: "2026-01-22T20:46:27Z"
+  labels:
+    app: pody
+  name: pody
+spec:
+  containers:
+  - args:
+    - server
+    - /data
+    - --console-address
+    - :9001
+    env:
+    - name: MINIO_ROOT_USER
+      value: minio_access_key
+    - name: MINIO_ROOT_PASSWORD
+      value: minio_secret_key
+    - name: MINIO_BUCKET
+      value: processed-images
+    image: docker.io/minio/minio:latest
+    name: minio
+    ports:
+    - containerPort: 9000
+      hostPort: 9000
+    - containerPort: 9001
+      hostPort: 9001
+    volumeMounts:
+    - mountPath: /data
+      name: home-nebojsa-documents-edge-device-data-host-0
+  - args:
+    - postgres
+    env:
+    - name: POSTGRES_DB
+      value: mydb
+    - name: POSTGRES_USER
+      value: myuser
+    - name: POSTGRES_PASSWORD
+      value: supersecret
+    image: docker.io/library/postgres:latest
+    name: postgres
+    ports:
+    - containerPort: 5432
+      hostPort: 5432
+    volumeMounts:
+    - mountPath: /var/lib/postgresql
+      name: home-nebojsa-documents-edge-device-postgres-data-host-0
+  - args:
+    - redis-server
+    image: docker.io/library/redis:7
+    name: redis
+    ports:
+    - containerPort: 6379
+      hostPort: 6379
+    volumeMounts:
+    - mountPath: /data
+      name: 90046d46edcc7e4ec0be92ec6818b4375e3914ddbd357ee0f8c9d2bb462a3284-pvc
+  - image: localhost/yolov8_model:latest
+    name: yolov8model
+    volumeMounts:
+    - mountPath: /app/logs
+      name: home-nebojsa-documents-edge-device-logs-yolov8-model-host-0
+    - mountPath: /app/shared_config
+      name: home-nebojsa-documents-edge-device-shared-config-host-1
+      readOnly: true
+    - mountPath: /app/model
+      name: home-nebojsa-documents-edge-device-models-host-2
+  - env:
+    - name: MPLCONFIGDIR
+      value: /tmp/matplotlib
+    - name: YOLO_CONFIG_DIR
+      value: /tmp/ultralytics
+    image: localhost/yolov8_server:latest
+    name: yolov8server
+    volumeMounts:
+    - mountPath: /app/logs
+      name: home-nebojsa-documents-edge-device-logs-host-0
+    - mountPath: /app/shared_config
+      name: home-nebojsa-documents-edge-device-shared-config-host-1
+      readOnly: true
+  - env:
+    - name: IMAGE_DIR
+      value: /app/images
+    - name: FALLBACK_CAMERA_SOURCE
+      value: /app/input_video.mp4
+    - name: RTSP_CAMERA_SOURCE
+      value: rtsp://192.168.1.20:554/stream1
+    - name: DB_PATH
+      value: /app/detection.db
+    - name: MODEL_PATH
+      value: /app/models/yolov8n.pt
+    - name: POSTGRES_PASSWORD
+      value: supersecret
+    - name: CAMERA_SOURCE
+      value: /dev/video0
+    - name: MINIO_ENDPOINT
+      value: http://minio:9000
+    - name: POSTGRES_DB
+      value: mydb
+    - name: POSTGRES_HOST
+      value: postgres
+    - name: REDIS_DB
+      value: "0"
+    - name: POSTGRES_USER
+      value: myuser
+    - name: MINIO_BUCKET
+      value: processed-images
+    - name: BASE_DIR
+      value: /app
+    - name: MINIO_ROOT_USER
+      value: minio_access_key
+    - name: REDIS_HOST
+      value: redis
+    - name: LOG_DIR
+      value: /app/logs
+    - name: REDIS_QUEUE_KEY
+      value: image_queue
+    - name: MINIO_ROOT_PASSWORD
+      value: minio_secret_key
+    - name: YOLO_CONFIDENCE_THRESHOLD
+      value: "0.25"
+    - name: REDIS_PORT
+      value: "6379"
+    image: localhost/streaming_app:latest
+    name: streamingapp
+    volumeMounts:
+    - mountPath: /app/logs
+      name: home-nebojsa-documents-edge-device-logs-streaming-app-host-0
+    - mountPath: /app/images
+      name: home-nebojsa-documents-edge-device-images-host-1
+  - env:
+    - name: REDIS_QUEUE_KEY
+      value: image_queue
+    - name: REDIS_PORT
+      value: "6379"
+    - name: LOG_DIR
+      value: /app/logs
+    - name: MINIO_ROOT_USER
+      value: minio_access_key
+    - name: MINIO_ROOT_PASSWORD
+      value: minio_secret_key
+    - name: DB_PATH
+      value: /app/detection.db
+    - name: POSTGRES_HOST
+      value: postgres
+    - name: MODEL_PATH
+      value: /app/models/yolov8n.pt
+    - name: POSTGRES_USER
+      value: myuser
+    - name: BASE_DIR
+      value: /app
+    - name: POSTGRES_PASSWORD
+      value: supersecret
+    - name: YOLO_CONFIDENCE_THRESHOLD
+      value: "0.25"
+    - name: POSTGRES_DB
+      value: mydb
+    - name: IMAGE_DIR
+      value: /app/images
+    - name: REDIS_HOST
+      value: redis
+    - name: MINIO_ENDPOINT
+      value: http://minio:9000
+    - name: REDIS_DB
+      value: "0"
+    - name: MINIO_BUCKET
+      value: processed-images
+    image: localhost/y_test_app:latest
+    name: testapp
+    volumeMounts:
+    - mountPath: /app/logs
+      name: home-nebojsa-documents-edge-device-logs-host-0
+    - mountPath: /app/output
+      name: home-nebojsa-documents-edge-device-image-host-1
+  volumes:
+  - hostPath:
+      path: /home/nebojsa/Documents/edge-device/image
+      type: Directory
+    name: home-nebojsa-documents-edge-device-image-host-1
+  - hostPath:
+      path: /home/nebojsa/Documents/edge-device/data
+      type: Directory
+    name: home-nebojsa-documents-edge-device-data-host-0
+  - hostPath:
+      path: /home/nebojsa/Documents/edge-device/postgres_data
+      type: Directory
+    name: home-nebojsa-documents-edge-device-postgres-data-host-0
+  - name: 90046d46edcc7e4ec0be92ec6818b4375e3914ddbd357ee0f8c9d2bb462a3284-pvc
+    persistentVolumeClaim:
+      claimName: 90046d46edcc7e4ec0be92ec6818b4375e3914ddbd357ee0f8c9d2bb462a3284
+  - hostPath:
+      path: /home/nebojsa/Documents/edge-device/logs/yolov8_model
+      type: Directory
+    name: home-nebojsa-documents-edge-device-logs-yolov8-model-host-0
+  - hostPath:
+      path: /home/nebojsa/Documents/edge-device/models
+      type: Directory
+    name: home-nebojsa-documents-edge-device-models-host-2
+  - hostPath:
+      path: /home/nebojsa/Documents/edge-device/logs
+      type: Directory
+    name: home-nebojsa-documents-edge-device-logs-host-0
+  - hostPath:
+      path: /home/nebojsa/Documents/edge-device/shared_config
+      type: Directory
+    name: home-nebojsa-documents-edge-device-shared-config-host-1
+  - hostPath:
+      path: /home/nebojsa/Documents/edge-device/logs/streaming_app
+      type: Directory
+    name: home-nebojsa-documents-edge-device-logs-streaming-app-host-0
+  - hostPath:
+      path: /home/nebojsa/Documents/edge-device/images
+      type: Directory
+    name: home-nebojsa-documents-edge-device-images-host-1
