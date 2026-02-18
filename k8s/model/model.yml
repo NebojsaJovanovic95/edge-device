@@ -1,24 +1,34 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: yolov8_model
+  name: model
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: yolov8_model
+      app: model
   template:
     metadata:
       labels:
-        app: yolov8_model
+        app: model
     spec:
       containers:
-      - name: yolov8_model
-        image: yolov8_model:latest
-        volumeMounts:
-        - name: models
-          mountPath: /app/model
+        - name: model
+          image: model:latest
+          imagePullPolicy: Never
+          workingDir: /app
+          envFrom:
+            - configMapRef:
+                name: shared-configmap
+          volumeMounts:
+            - name: model-weights
+              mountPath: /app/model
+            - name: logs
+              mountPath: /app/logs
       volumes:
-      - name: models
-        persistentVolumeClaim:
-          claimName: models-pvc
+        - name: logs
+          persistentVolumeClaim:
+            claimName: model-logs
+        - name: model-weights
+          persistentVolumeClaim:
+            claimName: model-weights
