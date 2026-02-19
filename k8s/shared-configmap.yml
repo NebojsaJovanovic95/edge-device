@@ -5,7 +5,6 @@ metadata:
 data:
   REDIS_HOST: "redis"
   REDIS_PORT: "6379"
-  redis_client: "redis://{REDIS_HOST}:{REDIS_PORT}"
   REDIS_MODEL_REQUEST_QUEUE: "model_request"
   REDIS_MODEL_RESULT_QUEUE: "model_result"
   LOG_DIR: "/app/logs"

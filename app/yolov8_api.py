@@ -12,12 +12,13 @@ from src.util import DetectionResponse
 from src.stream_processor import enqueue_image, process_queue
 from src.util import logger
 
-from shared_config import redis_client
-from shared_config.settings import (
-    REDIS_MODEL_REQUEST_QUEUE,
-    REDIS_MODEL_RESULT_QUEUE,
-    LOG_DIR
-)
+REDIS_MODEL_REQUEST_QUEUE = os.getenv("REDIS_MODEL_REQUEST_QUEUE")
+REDIS_MODEL_RESULT_QUEUE = os.getenv("REDIS_MODEL_RESULT_QUEUE")
+LOG_DIR = os.getenv("LOG_DIR")
+
+REDIS_HOST = os.getenv("REDIS_HOST")
+REDIS_PORT = os.getenv("REDIS_PORT")
+redis_client = f"redis://{REDIS_HOST}:{REDIS_PORT}"
 
 app = FastAPI(title="YOLOv8 Edge API")
 

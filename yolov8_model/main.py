@@ -4,14 +4,17 @@ import tempfile
 import os
 import json
 from ultralytics import YOLO
-from shared_config.redis_client import redis_client
-from shared_config.settings import (
-    REDIS_MODEL_REQUEST_QUEUE,
-    REDIS_MODEL_RESULT_QUEUE,
-    LOG_DIR
-)
 import sys
 import logging
+
+REDIS_MODEL_REQUEST_QUEUE = os.getenv("REDIS_MODEL_REQUEST_QUEUE")
+REDIS_MODEL_RESULT_QUEUE = os.getenv("REDIS_MODEL_RESULT_QUEUE")
+LOG_DIR = os.getenv("LOG_DIR")
+
+REDIS_HOST = os.getenv("REDIS_HOST")
+REDIS_PORT = os.getenv("REDIS_PORT")
+redis_client = f"redis://{REDIS_HOST}:{REDIS_PORT}"
+
 os.makedirs(LOG_DIR, exist_ok=True)
 log_path = os.path.join(LOG_DIR, "yolov8_model.log")
 logging.basicConfig(

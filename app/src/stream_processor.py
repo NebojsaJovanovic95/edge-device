@@ -3,7 +3,10 @@ import asyncio, tempfile, os, logging, pickle, json, uuid
 from src.db_util import db
 from src.image_storage import local_storage, minio_storage
 from src.config import settings
-from shared_config.redis_client import redis_client
+
+REDIS_HOST = os.getenv("REDIS_HOST")
+REDIS_PORT = os.getenv("REDIS_PORT")
+redis_client = f"redis://{REDIS_HOST}:{REDIS_PORT}"
 
 NAME = "STREAM"
 
