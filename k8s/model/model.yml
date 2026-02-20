@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
         - name: model
-          image: model:latest
-          imagePullPolicy: Never
+          image: nebojsajovanovic/model:latest
+          imagePullPolicy: Always
           workingDir: /app
           envFrom:
             - configMapRef:

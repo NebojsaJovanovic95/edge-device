@@ -5,29 +5,20 @@ from fastapi.responses import JSONResponse, StreamingResponse
 import uvicorn, asyncio, tempfile, os, json
 from typing import Any
 
-from src.config import settings
 from src.db_util import db
 from src.image_storage import minio_storage
 from src.util import DetectionResponse
 from src.stream_processor import enqueue_image, process_queue
 from src.util import logger
-
-REDIS_MODEL_REQUEST_QUEUE = os.getenv("REDIS_MODEL_REQUEST_QUEUE")
-REDIS_MODEL_RESULT_QUEUE = os.getenv("REDIS_MODEL_RESULT_QUEUE")
-LOG_DIR = os.getenv("LOG_DIR")
-
-REDIS_HOST = os.getenv("REDIS_HOST")
-REDIS_PORT = os.getenv("REDIS_PORT")
-redis_client = f"redis://{REDIS_HOST}:{REDIS_PORT}"
+from src.config import REDIS_MODEL_REQUEST_QUEUE, REDIS_MODEL_RESULT_QUEUE, LOG_DIR, REDIS_HOST, REDIS_PORT, redis_client
 
 app = FastAPI(title="YOLOv8 Edge API")
-
 
 NAME: str = "yolov8_server"
 
 @app.on_event("startup")
 async def startup_event():
-    os.makedirs(settings.LOG_DIR, exist_ok=True)
+    os.makedirs(LOG_DIR, exist_ok=True)
     asyncio.create_task(process_queue())
 
 @app.post("/stream")
@@ -69,10 +60,10 @@ async def detect(
         })
 
         # Send job
-        await redis_client.rpush(settings.REDIS_MODEL_REQUEST_QUEUE, payload)
+        await redis_client.rpush(REDIS_MODEL_REQUEST_QUEUE, payload)
 
         # Listen for result
-        result_key = f"{settings.REDIS_MODEL_RESULT_QUEUE_PREFIX}{request_id}"
+        result_key = f"{REDIS_MODEL_RESULT_QUEUE_PREFIX}{request_id}"
         _, result_raw = await redis_client.blpop(result_key)
         result = pickle.loads(result_raw)
         detection_data = result["detection"]
@@ -83,7 +74,7 @@ async def detect(
         camera_id = 0,
         image_path = str(image_path),
         raw_detections = detection_data,
-        model_name = settings.MODEL_NAME
+        model_name = MODEL_NAME
     )
 
     logger.info(f"[{NAME}]: Saved detection {detection_id}.")

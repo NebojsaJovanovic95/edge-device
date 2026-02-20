@@ -7,7 +7,7 @@ import threading
 from src.util import logger
 import psycopg2
 from psycopg2.extras import RealDictCursor, Json
-from src.config import settings
+from src.config import POSTGRES_DSN, CACHE_DB_PATH
 from psycopg2 import OperationalError
 
 MAX_ROW_LIMIT = 1000
@@ -108,7 +108,7 @@ class SqliteDb(BaseDb):
 
     def __init__(
         self,
-        db_path: str = settings.CACHE_DB_PATH
+        db_path: str = CACHE_DB_PATH
     ):
         self.db_path = db_path
         self._init_db()
@@ -687,11 +687,11 @@ def init_db_with_retry(
     delay: int = 3
 ) -> DetectionDb:
     for attempt in range(max_retries):
-        logger.info(f"Connecting to Postgres: {settings.POSTGRES_DSN} (attempt {attempt + 1})")
+        logger.info(f"Connecting to Postgres: {POSTGRES_DSN} (attempt {attempt + 1})")
         try:
             db_instance = DetectionDb(
-                postgres_dsn=settings.POSTGRES_DSN,
-                sqlite_path=settings.CACHE_DB_PATH
+                postgres_dsn=POSTGRES_DSN,
+                sqlite_path=CACHE_DB_PATH
             )
             logger.info("Successfully connected to Postgres!")
             return db_instance

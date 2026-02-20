@@ -7,7 +7,14 @@ import boto3
 from botocore.exceptions import NoCredentialsError, ClientError
 from io import BytesIO
 from src.util import logger
-from src.config import settings
+from src.config import (
+    IMAGE_DIR,
+    USE_MINIO,
+    MINIO_ENDPOINT,
+    MINIO_ROOT_USER,
+    MINIO_ROOT_PASSWORD,
+    MINIO_BUCKET
+)
 
 class ImageStorage:
     """
@@ -122,15 +129,15 @@ class ImageStorage:
 
 
 minio_storage: ImageStorage = ImageStorage(
-    base_dir=settings.IMAGE_DIR,
-    use_minio=settings.USE_MINIO,
-    minio_endpoint=settings.MINIO_ENDPOINT,
-    minio_access_key=settings.MINIO_ROOT_USER,
-    minio_secret_key=settings.MINIO_ROOT_PASSWORD,
-    minio_bucket=settings.MINIO_BUCKET
+    base_dir=IMAGE_DIR,
+    use_minio=USE_MINIO,
+    minio_endpoint=MINIO_ENDPOINT,
+    minio_access_key=MINIO_ROOT_USER,
+    minio_secret_key=MINIO_ROOT_PASSWORD,
+    minio_bucket=MINIO_BUCKET
 )
 
 local_storage: ImageStorage = ImageStorage(
-    base_dir=settings.IMAGE_DIR,
+    base_dir=IMAGE_DIR,
     use_minio=False
 )

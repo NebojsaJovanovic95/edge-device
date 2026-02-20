@@ -6,6 +6,7 @@ import json
 from ultralytics import YOLO
 import sys
 import logging
+import redis.asyncio as aioredis
 
 REDIS_MODEL_REQUEST_QUEUE = os.getenv("REDIS_MODEL_REQUEST_QUEUE")
 REDIS_MODEL_RESULT_QUEUE = os.getenv("REDIS_MODEL_RESULT_QUEUE")
@@ -13,7 +14,14 @@ LOG_DIR = os.getenv("LOG_DIR")
 
 REDIS_HOST = os.getenv("REDIS_HOST")
 REDIS_PORT = os.getenv("REDIS_PORT")
-redis_client = f"redis://{REDIS_HOST}:{REDIS_PORT}"
+REDIS_DB = os.getenv("REDIS_DB")
+
+redis_client: aioredis.Redis = aioredis.Redis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    db=REDIS_DB,
+    decode_responses=False  # store raw bytes
+)
 
 os.makedirs(LOG_DIR, exist_ok=True)
 log_path = os.path.join(LOG_DIR, "yolov8_model.log")
