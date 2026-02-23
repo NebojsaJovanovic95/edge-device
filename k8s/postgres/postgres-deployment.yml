@@ -21,4 +21,4 @@ spec:
             - configMapRef:
                 name: shared-configmap
             - secretRef:
-                name: shared-secrets-secrets
+                name: shared-secrets
