@@ -2,16 +2,12 @@ import asyncio, tempfile, os, logging, pickle, json, uuid
 
 from src.db_util import db
 from src.image_storage import local_storage, minio_storage
-from src.config import settings
-
-REDIS_HOST = os.getenv("REDIS_HOST")
-REDIS_PORT = os.getenv("REDIS_PORT")
-redis_client = f"redis://{REDIS_HOST}:{REDIS_PORT}"
+from src.config import LOG_DIR, MODEL_NAME, REDIS_HOST, REDIS_PORT, REDIS_MODEL_REQUEST_QUEUE, REDIS_MODEL_RESULT_QUEUE, REDIS_TASK_QUEUE, redis_client
 
 NAME = "STREAM"
 
-os.makedirs(settings.LOG_DIR, exist_ok=True)
-log_path = os.path.join(settings.LOG_DIR, "stream.log")
+os.makedirs(LOG_DIR, exist_ok=True)
+log_path = os.path.join(LOG_DIR, "stream.log")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -26,7 +22,7 @@ async def enqueue_image(image_bytes: bytes, filename: str):
     """Adds an image to redis queue as aserialized tuple."""
     data = pickle.dumps((image_bytes, filename))
     await redis_client.rpush(
-        settings.REDIS_TASK_QUEUE,
+        REDIS_TASK_QUEUE,
         data
     )
     logging.info(f"[{NAME}] Queued image: {filename}") 
@@ -36,7 +32,7 @@ async def process_queue():
     logger.info(f"[{NAME}] Starting Redis YOLO worker...")
     while True:
         data = await redis_client.blpop(
-            settings.REDIS_TASK_QUEUE,
+            REDIS_TASK_QUEUE,
             timeout=5
         )
         if data is None:
@@ -67,12 +63,12 @@ async def process_queue():
             })
 
             await redis_client.rpush(
-                settings.REDIS_MODEL_REQUEST_QUEUE,
+                REDIS_MODEL_REQUEST_QUEUE,
                 payload
             )
 
             # -------- WAIT FOR RESULT FROM WORKER --------
-            result_key = f"{settings.REDIS_MODEL_RESULT_QUEUE}:{request_id}"
+            result_key = f"{REDIS_MODEL_RESULT_QUEUE}:{request_id}"
             _, result_raw = await redis_client.blpop(result_key)
             result = pickle.loads(result_raw)
 
@@ -87,7 +83,7 @@ async def process_queue():
                 camera_id = 0,
                 image_path=str(minio_path),
                 raw_detections=detection_data,
-                model_name=settings.MODEL_NAME
+                model_name=MODEL_NAME
             )
             logger.info(f"[{NAME}] Processed and uploaded {filename}")
 
