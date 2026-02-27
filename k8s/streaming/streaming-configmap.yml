@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: streaming-app-config
+data:
+  CAMERA_SOURCE: "/dev/video0"
+  RTSP_CAMERA_SOURCE: "rtsp://192.168.1.20:554/stream1"
+  FALLBACK_CAMERA_SOURCE: "/app/input_video.mp4"
